@@ -1,0 +1,457 @@
+.leaderboard-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  background: var(--dark-accent);
+  border-radius: 15px;
+  padding: 2rem;
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.1);
+  margin-top: 80px;
+  position: relative;
+}
+
+.leaderboard-header {
+  margin-top: 50px;
+  text-align: center;
+}
+
+.table-container {
+  display: flex;
+  gap: 0.5rem;
+  position: relative;
+}
+
+.leaderboard-header h1 {
+  font-family: 'Orbitron', sans-serif;
+  color: var(--primary);
+  font-size: 2.5rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.leaderboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow-x: auto;
+}
+
+.leaderboard-table thead {
+  background: rgba(255, 215, 0, 0.1);
+  border-bottom: 2px solid var(--primary);
+}
+
+.leaderboard-table th {
+  padding: 1.2rem;
+  text-align: left;
+  font-family: 'Orbitron', sans-serif;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.leaderboard-table td {
+  padding: 1rem;
+  border-bottom: 1px solid rgba(255, 215, 0, 0.1);
+}
+
+.leaderboard-table tr:hover {
+  background: rgba(255, 215, 0, 0.05);
+}
+
+.user-rank {
+  font-family: 'Orbitron', sans-serif;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 1rem;
+  border: 1px solid var(--primary);
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+}
+
+.points-column {
+  text-align: right;
+  font-weight: 700;
+}
+
+.nav-buttons {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 60px;
+  background: var(--dark);
+  z-index: 10;
+  padding: 0 20px;
+  box-sizing: border-box;
+}
+
+.back-button {
+  background: var(--primary);
+  color: var(--dark);
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 5px;
+  font-family: 'Orbitron', sans-serif;
+  cursor: pointer;
+  transition: background 0.3s;
+  z-index: 11;
+}
+
+.back-button:hover {
+  background: var(--secondary);
+  color: white;
+}
+
+.current-page {
+  font-family: 'Orbitron', sans-serif;
+  color: var(--primary);
+  text-align: center;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.leaderboard-table-wrapper {
+  width: 48%;
+  height: 475px;
+  overflow-y: scroll;
+  margin-right: 10px;
+  margin-top: 30px;
+}
+
+.leaderboard-table-wrapper::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
+
+.recent-joins {
+  flex: 1;
+  background: rgba(255, 215, 0, 0.05);
+  border-radius: 10px;
+  padding: 1rem;
+  height: 475px;
+  overflow-y: auto;
+  margin-bottom: 30px;
+  margin-top: 30px;
+}
+
+.recent-joins h2 {
+  font-family: 'Orbitron', sans-serif;
+  color: var(--primary);
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.recent-joins-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.recent-joins-list li {
+  margin-bottom: 0.8rem;
+  font-size: 0.8rem;
+  border-bottom: 1px solid rgba(255, 215, 0, 0.1);
+  padding-bottom: 0.8rem;
+}
+
+.recent-joins-list li:last-child {
+  border-bottom: none;
+}
+
+.join-time {
+  display: block;
+  color: var(--secondary);
+  margin-bottom: 0.2rem;
+}
+
+.join-user,
+.inviter {
+  color: var(--primary);
+  margin: 0 0.3rem;
+}
+
+.current-user-row {
+  background-color: rgba(76, 175, 80, 0.1) !important;
+  border-left: 3px solid #4caf50;
+  font-weight: bold;
+}
+
+.current-user-row:hover {
+  background: rgba(255, 215, 0, 0.1) !important;
+}
+
+.current-user-row .user-avatar {
+  background: var(--primary);
+  color: var(--dark);
+  border: 2px solid var(--primary);
+  font-size: 1.3rem;
+}
+
+.current-user-row .user-info {
+  color: var(--primary);
+  font-family: 'Orbitron', sans-serif;
+}
+
+.current-user-row .user-info .user-name {
+  color: var(--primary);
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.current-user-row .points-column {
+  font-weight: bold;
+  color: var(--primary);
+  font-size: 1.2rem;
+  text-align: right;
+}
+
+.first-place {
+  background-color: rgba(255, 215, 0, 0.05);
+  border-left: 4px solid #FFD700;
+  border-bottom: 1px solid #FFD700;
+}
+
+.second-place {
+  background-color: rgba(255, 0, 0, 0.05);
+  border-left: 4px solid #FF0000;
+  border-bottom: 1px solid #FF0000;
+}
+
+.third-place {
+  background-color: rgba(138, 43, 226, 0.05);
+  border-left: 4px solid #8A2BE2;
+  border-bottom: 1px solid #8A2BE2;
+}
+
+.first-place:hover {
+  background-color: rgba(255, 215, 0, 0.1);
+}
+
+.second-place:hover {
+  background-color: rgba(255, 0, 0, 0.1);
+}
+
+.third-place:hover {
+  background-color: rgba(138, 43, 226, 0.1);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .leaderboard-container {
+    padding: 1rem;
+  }
+  
+  .leaderboard-table th,
+  .leaderboard-table td {
+    padding: 0.8rem;
+    font-size: 0.9rem;
+  }
+  
+  .table-container {
+    flex-direction: column;
+  }
+  
+  .leaderboard-table-wrapper {
+    height: 300px;
+    width: 100% !important;
+  }
+  
+  .recent-joins {
+    max-width: 700px;
+    width: 90% !important;
+    position: relative;
+    left: 1px;
+  }
+}
+
+@media (max-width: 480px) {
+  .leaderboard-header h1 {
+    font-size: 1.5rem;
+  }
+  
+  .leaderboard-table th,
+  .leaderboard-table td {
+    font-size: 0.8rem;
+  }
+  
+  .back-button {
+    font-size: 0.9rem;
+    padding: 0.4rem 0.8rem;
+  }
+  
+  .leaderboard-container {
+    padding: 0.5rem;
+  }
+  
+  .leaderboard-table-wrapper {
+    height: 250px;
+  }
+  
+  .recent-joins {
+    font-size: 0.8rem;
+  }
+  
+  .recent-joins h2 {
+    font-size: 1.2rem;
+  }
+}
+
+/* Loading indicator */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 50px 0;
+  color: white;
+}
+
+.loading-spinner {
+  width: 60px;
+  height: 60px;
+  border: 5px solid rgba(255, 215, 0, 0.2);
+  border-top: 5px solid var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Error display */
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+  text-align: center;
+}
+
+.error-message {
+  color: #ff5555;
+  margin-bottom: 20px;
+  font-size: 18px;
+}
+
+.retry-button {
+  background: linear-gradient(45deg, var(--primary), #ff9e1c);
+  color: var(--dark);
+  border: none;
+  border-radius: 8px;
+  padding: 12px 30px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+}
+
+.retry-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(255, 215, 0, 0.4);
+}
+
+.no-data {
+  text-align: center;
+  padding: 40px 0;
+  color: #ccc;
+  font-style: italic;
+  font-size: 16px;
+}
+
+/* Стили для текущего пользователя в верхней части таблицы */
+.current-user-row {
+  background-color: rgba(76, 175, 80, 0.1) !important;
+  border-left: 3px solid #4caf50;
+  font-weight: bold;
+}
+
+/* Стили для текущего пользователя в основном списке */
+.current-user-in-list {
+  background-color: rgba(76, 175, 80, 0.05) !important;
+  border-left: 2px solid #4caf50;
+}
+
+.current-badge {
+  background-color: #4caf50;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+
+.current-badge-small {
+  background-color: #4caf50;
+  color: white;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.6rem;
+  margin-left: 3px;
+  vertical-align: middle;
+}
+
+.current-user-avatar {
+  background-color: #4caf50 !important;
+  color: white !important;
+}
+
+.current-user-avatar-small {
+  background-color: rgba(76, 175, 80, 0.7) !important;
+  color: white !important;
+}
+
+.current-user-label {
+  color: #4caf50;
+  font-weight: bold;
+}
+
+.current-user-label-small {
+  color: #4caf50;
+  font-size: 0.8em;
+}
+
+/* Разделитель между текущим пользователем и топом */
+.rank-separator {
+  height: 10px;
+  background: linear-gradient(90deg, 
+    rgba(255, 215, 0, 0.2) 0%, 
+    rgba(255, 215, 0, 0.05) 100%);
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--primary);
+}
+
+.rank-separator td {
+  padding: 5px !important;
+} 

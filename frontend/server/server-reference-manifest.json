@@ -1,0 +1,5 @@
+{
+  "node": {},
+  "edge": {},
+  "encryptionKey": "${process.env.SERVER_REFERENCE_MANIFEST_ENCRYPTION_KEY}"
+}

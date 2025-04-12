@@ -1,0 +1,7 @@
+<svg width="300" height="300" viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="300" height="300" fill="#1a1a1a"/>
+  <rect x="5" y="5" width="290" height="290" rx="10" stroke="#FFD700" stroke-width="2"/>
+  <text x="150" y="130" font-family="Arial" font-size="40" fill="#FFD700" text-anchor="middle">NFT</text>
+  <text x="150" y="180" font-family="Arial" font-size="20" fill="#FFFFFF" text-anchor="middle">Samurai Pepe</text>
+  <path d="M130 210 L170 210 L170 220 L130 220 Z" fill="#FFD700"/>
+</svg> 

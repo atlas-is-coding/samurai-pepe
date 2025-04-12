@@ -1,0 +1,50 @@
+{
+  "name": "samurai-pepe",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:port80": "next dev -p 80",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "ngrok": "ngrok http 3000"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.30.1",
+    "@metaplex-foundation/js": "^0.20.1",
+    "@prisma/client": "^6.5.0",
+    "@solana/spl-token": "^0.3.11",
+    "@solana/wallet-adapter-base": "^0.9.24",
+    "@solana/wallet-adapter-react": "^0.15.36",
+    "@solana/wallet-adapter-react-ui": "^0.9.36",
+    "@solana/wallet-adapter-wallets": "^0.19.33",
+    "@solana/web3.js": "^1.98.0",
+    "dotenv": "^16.4.7",
+    "framer-motion": "^12.6.3",
+    "mongoose": "^8.13.2",
+    "next": "15.2.4",
+    "next-safe-action": "^7.10.4",
+    "ngrok": "^5.0.0-beta.2",
+    "pino-pretty": "^13.0.0",
+    "prisma": "^6.5.0",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-hot-toast": "^2.5.2",
+    "react-intersection-observer": "^9.16.0",
+    "sonner": "^2.0.3",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "15.2.4",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

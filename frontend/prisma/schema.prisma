@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String            @id @default(cuid())
+  walletAddress      String?           @unique
+  points             Int               @default(0)
+  referredBy         String?
+  inviteCode         String?           @unique
+  hasPurchasedNft    Boolean           @default(false)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  twitterUsername    String?
+  telegramId         String?           @unique
+  telegramUsername   String?
+  name               String?
+  completedQuests    QuestCompletion[] @relation("UserCompletedQuests")
+  referralsReceived  ReferralLog[]     @relation("Invitee")
+  referralsInitiated ReferralLog[]     @relation("Referrer")
+  userReferrals      UserReferral[]    @relation("UserReferrals")
+  nftPurchases       NftPurchase[]     @relation("UserPurchases")
+}
+
+model QuestCompletion {
+  id        String   @id @default(cuid())
+  userId    String
+  questId   Int
+  completed Boolean  @default(true)
+  createdAt DateTime @default(now())
+  user      User     @relation("UserCompletedQuests", fields: [userId], references: [id])
+
+  @@unique([userId, questId])
+  @@index([userId])
+}
+
+model UserReferral {
+  id              String   @id @default(cuid())
+  userId          String
+  referredAddress String
+  createdAt       DateTime @default(now())
+  user            User     @relation("UserReferrals", fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model ReferralLog {
+  id              String   @id @default(cuid())
+  referrerAddress String
+  userAddress     String
+  pointsAwarded   Int      @default(0)
+  status          String   @default("pending")
+  createdAt       DateTime @default(now())
+  user            User     @relation("Invitee", fields: [userAddress], references: [walletAddress])
+  referrer        User     @relation("Referrer", fields: [referrerAddress], references: [walletAddress])
+
+  @@index([referrerAddress])
+  @@index([userAddress])
+}
+
+model NftPurchase {
+  id            String   @id @default(cuid())
+  userId        String
+  nftId         String
+  pointsAwarded Int      @default(0)
+  createdAt     DateTime @default(now())
+  user          User     @relation("UserPurchases", fields: [userId], references: [id])
+
+  @@index([userId])
+}
