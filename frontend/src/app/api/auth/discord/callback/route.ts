@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID!;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET!;
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI!;
-const CLIENT_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+const CLIENT_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://pepesamurai.com';
 
 // Интерфейсы для типизации ответов от Discord API
 interface DiscordTokenResponse {

@@ -17,6 +17,7 @@ interface ReferralData {
   referralCount: number;
   points: number;
   inviteCode: string;
+  error?: string;
 }
 
 export function ReferralButton({ className = '' }: ReferralButtonProps) {

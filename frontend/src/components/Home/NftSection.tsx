@@ -38,22 +38,7 @@ interface NftCard {
   nftId: string; // Добавляю идентификатор для минтинга
 }
 
-// Обновляем глобальный тип для доступа к Phantom API
-declare global {
-  interface Window {
-    __WALLET_CONNECTED__?: boolean;
-    __WALLET_PUBLIC_KEY__?: string | null;
-    __WALLET_CONNECTING__?: boolean;
-    solana?: {
-      isPhantom?: boolean;
-      connect: () => Promise<{ publicKey: PublicKey }>;
-      disconnect: () => Promise<void>;
-      signTransaction: (transaction: Transaction) => Promise<Transaction>;
-      signAllTransactions: (transactions: Transaction[]) => Promise<Transaction[]>;
-      request: (request: any) => Promise<any>;
-    };
-  }
-}
+// Глобальное объявление типов перенесено в отдельный файл types/global.d.ts
 
 export function NftSection() {
   const [isMobile, setIsMobile] = useState(false);

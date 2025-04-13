@@ -65,7 +65,7 @@ async function completeQuest(walletAddress: string, questId: number) {
   console.log(`Найден пользователь: ${user.id}`);
   
   // Проверяем, не выполнен ли уже квест
-  const existingQuest = await prisma.QuestCompletion.findFirst({
+  const existingQuest = await prisma.questCompletion.findFirst({
     where: {
       userId: user.id,
       questId: questId
@@ -101,7 +101,7 @@ async function completeQuest(walletAddress: string, questId: number) {
   
   // Добавляем запись о выполненном квесте
   try {
-    const newQuest = await prisma.QuestCompletion.create({
+    const newQuest = await prisma.questCompletion.create({
       data: {
         userId: user.id,
         questId: questId

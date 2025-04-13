@@ -37,7 +37,7 @@ function clearAllCookies() {
 function clearLocalStorage() {
   try {
     // Save only certain items that shouldn't be cleared
-    const itemsToKeep = [
+    const itemsToKeep: string[] = [
       // Add any localStorage items you want to keep here
     ];
     

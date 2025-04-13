@@ -8,6 +8,9 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const telegramData = Object.fromEntries(searchParams.entries());
     
+    // Логируем полные данные для отладки
+    console.log('Полученные данные от Telegram:', telegramData);
+    
     // Данные, которые нужно проверить на подлинность
     const { hash, ...dataToCheck } = telegramData;
     
@@ -41,6 +44,8 @@ export async function GET(request: NextRequest) {
     
     // Получаем id пользователя Telegram
     const telegramId = dataToCheck.id;
+    // В Telegram OAuth данные пользователя приходят в поле id
+    // Дополнительно можем получать эти данные из полей auth_date, first_name, last_name, username, photo_url
     
     if (!telegramId) {
       return NextResponse.json({ error: 'Telegram ID is missing' }, { status: 400 });
@@ -61,7 +66,9 @@ export async function GET(request: NextRequest) {
         data: { 
           telegramUsername: dataToCheck.username || undefined,
           name: dataToCheck.first_name || undefined,
-          walletAddress: walletAddress || user.walletAddress
+          walletAddress: walletAddress || user.walletAddress,
+          // В Telegram OAuth поле id это и есть user_id
+          telegramUserId: telegramId
         }
       });
     } else {
@@ -71,7 +78,8 @@ export async function GET(request: NextRequest) {
           telegramId,
           telegramUsername: dataToCheck.username || undefined,
           name: dataToCheck.first_name || undefined,
-          walletAddress
+          walletAddress,
+          telegramUserId: telegramId
         }
       });
     }

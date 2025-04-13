@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Generate referral link using the invite code
-    const host = request.headers.get('host') || 'localhost:3000';
+    const host = request.headers.get('host') || 'pepesamurai.com';
     const protocol = host.includes('localhost') ? 'http' : 'https';
     const referralLink = `${protocol}://${host}/ref/${user.inviteCode}`;
     
@@ -250,6 +250,13 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json(
           { error: 'Invalid invite code' }, 
           { status: 404 }
+        );
+      }
+      
+      if (!referrer.walletAddress) {
+        return NextResponse.json(
+          { error: 'Inviting user has invalid wallet address' }, 
+          { status: 400 }
         );
       }
       

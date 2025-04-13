@@ -1,7 +1,7 @@
 import { toast } from "react-hot-toast";
 
 // Функция для выполнения квеста через API
-const completeQuest = async (questId: number) => {
+const completeQuest = async (questId: number, walletAddress: string, refreshUserData?: () => void) => {
   if (!walletAddress) {
     toast.error('First connect your wallet');
     return;
@@ -29,7 +29,7 @@ const completeQuest = async (questId: number) => {
       }
     } else {
       if (result.message === 'Quest already completed') {
-        toast.info('This quest is already completed');
+        toast.success('This quest is already completed');
       } else {
         toast.error(result.error || 'Failed to complete quest');
       }

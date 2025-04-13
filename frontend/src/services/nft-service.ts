@@ -1,16 +1,10 @@
 import { Connection, PublicKey, Transaction as SolanaTransaction, sendAndConfirmTransaction } from '@solana/web3.js';
 import { NFT, Transaction } from '@/types';
 import { Metaplex } from '@metaplex-foundation/js';
-import { createCandyMachineV2 } from '@metaplex-foundation/mpl-candy-machine';
 
 // Получаем endpoint из переменных окружения
 const SOLANA_RPC_ENDPOINT = process.env.NEXT_PUBLIC_SOLANA_RPC_ENDPOINT || 'https://api.devnet.solana.com';
 
-// Адреса Candy Machine для NFT
-const CANDY_MACHINE_ADDRESS = 'FJZPK92GWTCMLkSwzbwA5k2UGC9rmYAZo9ZsZgqWoG79';
-const COLLECTION_MINT_ADDRESS = '9qDtyLbFNgfdX7jmATvSZE5jMERm9kwqyPajk1WBUtYW';
-
-// Адреса NFT (для проверки)
 export const NFT_ADDRESSES = {
   NFT1: '9qDtyLbFNgfdX7jmATvSZE5jMERm9kwqyPajk1WBUtYW', // Общий адрес коллекции
   NFT2: '9qDtyLbFNgfdX7jmATvSZE5jMERm9kwqyPajk1WBUtYW', // Общий адрес коллекции
@@ -44,7 +38,7 @@ export class NftService {
       // Преобразуем в нужный формат
       const nfts = userNFTs.map(nft => {
         return {
-          address: nft.mintAddress.toBase58(),
+          address: nft.address.toBase58(),
           name: nft.name || 'Samurai NFT',
           symbol: nft.symbol || 'SMRI',
           uri: nft.uri || '',
@@ -146,8 +140,8 @@ export class NftService {
         timestamp: new Date(txInfo.blockTime! * 1000).toISOString(),
         blockTime: txInfo.blockTime,
         type: 'mint',
-        from: txInfo.transaction.message.accountKeys[0].toString(),
-        to: txInfo.transaction.message.accountKeys[1].toString(),
+        from: 'unknown-address',
+        to: 'unknown-address',
       } as Transaction;
     } catch (error) {
       console.error('Error getting transaction information:', error);

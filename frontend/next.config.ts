@@ -17,8 +17,10 @@ const nextConfig: NextConfig = {
     ];
   },
   // Разрешаем использование ngrok для разработки
+  // output: 'export',
+
   experimental: {
-    allowedDevOrigins: ['localhost', '127.0.0.1', '.ngrok-free.app', '.ngrok.io'],
+    allowedDevOrigins: ['localhost', '127.0.0.1', '.ngrok-free.app', '.ngrok.io', "pepesamurai.com"],
   },
 };
 

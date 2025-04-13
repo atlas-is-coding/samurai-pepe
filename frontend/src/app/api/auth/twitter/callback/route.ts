@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 const TWITTER_CLIENT_ID = process.env.TWITTER_CLIENT_ID!;
 const TWITTER_CLIENT_SECRET = process.env.TWITTER_CLIENT_SECRET!;
 const TWITTER_REDIRECT_URI = process.env.TWITTER_REDIRECT_URI!;
-const CLIENT_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+const CLIENT_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://pepesamurai.com/';
 
 // Интерфейсы для типизации ответов от Twitter API
 interface TwitterTokenResponse {

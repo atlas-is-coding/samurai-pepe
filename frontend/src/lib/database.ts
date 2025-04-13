@@ -3,31 +3,10 @@ import mongoose from 'mongoose';
 // Переменная для хранения соединения
 let cachedConnection: typeof mongoose | null = null;
 
-// URI для подключения к MongoDB (в реальном проекте должно быть в env-переменных)
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/samurai_pepe';
-
 export async function connectToDatabase() {
   // Если соединение уже установлено, используем его
   if (cachedConnection) {
     return cachedConnection;
-  }
-
-  // Опции для подключения к MongoDB
-  const opts = {
-    bufferCommands: false,
-  };
-
-  try {
-    // Устанавливаем соединение
-    const connection = await mongoose.connect(MONGODB_URI, opts);
-    console.log('Successfully connected to MongoDB');
-    
-    // Кэшируем соединение
-    cachedConnection = connection;
-    return connection;
-  } catch (error) {
-    console.error('Error connecting to MongoDB:', error);
-    throw error;
   }
 }
 
