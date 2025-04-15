@@ -378,7 +378,6 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
           {connecting ? 'CONNECTING...' : 'CONNECT WALLET'}
         </Button>
         
-        {/* Original wallet connection button (hidden) */}
         <div className="hidden-wallet-button">
           <WalletMultiButton />
         </div>
