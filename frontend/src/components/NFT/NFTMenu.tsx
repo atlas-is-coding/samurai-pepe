@@ -12,6 +12,7 @@ interface NFTMenuProps {
 export function NFTMenu({ isVisible }: NFTMenuProps) {
   const { nfts, ownedNFTs, totalPoints, isLoading, syncPoints } = useSolanaNft();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [prevPoints, setPrevPoints] = useState(0);
   
   if (!isVisible) return null;
   
@@ -21,10 +22,14 @@ export function NFTMenu({ isVisible }: NFTMenuProps) {
       setIsSyncing(true);
       toast.loading('Синхронизация баллов...', { id: 'sync-toast' });
       
+      // Сохраняем текущее количество баллов
       const startPoints = totalPoints;
+      setPrevPoints(startPoints);
+      
+      // Синхронизируем баллы
       await syncPoints();
       
-      // Показываем уведомление об успешной синхронизации
+      // Вычисляем разницу баллов после синхронизации
       const pointsDiff = totalPoints - startPoints;
       
       if (pointsDiff > 0) {
@@ -63,21 +68,9 @@ export function NFTMenu({ isVisible }: NFTMenuProps) {
         ) : (
           <div className="nft-list">
             {nfts.map((nft) => (
-              <div key={nft.mint} className="nft-item">
-                <div className="nft-image-container">
-                  <img 
-                    src={nft.image} 
-                    alt={nft.name} 
-                    className="nft-image"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = '/nft/placeholder-nft.svg';
-                    }}
-                  />
-                </div>
-                <div className="nft-details">
-                  <div className="nft-name">{nft.name}</div>
-                  <div className="nft-count">Quantity: {nft.count}</div>
-                </div>
+              <div key={nft.mint} className="nft-item-simple">
+                <div className="nft-name">{nft.name}</div>
+                <div className="nft-count">Quantity: {nft.count}</div>
               </div>
             ))}
             

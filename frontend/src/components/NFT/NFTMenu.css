@@ -169,4 +169,19 @@
 .force-points-button:disabled {
   background-color: rgba(128, 128, 128, 0.7);
   cursor: not-allowed;
+}
+
+.nft-item-simple {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #252525;
+  border-radius: 6px;
+  padding: 10px 12px;
+  border: 1px solid #333;
+  transition: background-color 0.2s ease;
+}
+
+.nft-item-simple:hover {
+  background-color: #2a2a2a;
 } 

@@ -28,18 +28,24 @@ export async function POST(request: NextRequest) {
     const nft1Points = (nfts.NFT1 || 0) * 10;
     const nft2Points = (nfts.NFT2 || 0) * 20;
     const nft3Points = (nfts.NFT3 || 0) * 50;
-    const totalPoints = nft1Points + nft2Points + nft3Points;
+    const totalNftPoints = nft1Points + nft2Points + nft3Points;
     
     // Проверяем, есть ли NFT вообще
     const hasAnyNft = nfts.NFT1 > 0 || nfts.NFT2 > 0 || nfts.NFT3 > 0;
     
     if (!hasAnyNft) {
       console.log(`У пользователя ${walletAddress} нет NFT, синхронизация не требуется`);
+      
+      // Получаем текущие баллы пользователя из других источников
+      const existingUser = await prisma.user.findUnique({
+        where: { walletAddress }
+      });
+      
       return NextResponse.json({
         success: true,
         walletAddress,
-        message: 'No NFTs found, sync not needed',
-        totalPoints: 0
+        message: 'No NFTs found, keeping existing points',
+        totalPoints: existingUser?.points || 0
       });
     }
     
@@ -48,20 +54,17 @@ export async function POST(request: NextRequest) {
       where: { walletAddress }
     });
     
-    // Упрощенная логика для демонстрации - просто обновляем баллы на основе текущего владения NFT
-    // Полная логика через проверку предыдущих покупок создает слишком много сложностей
-    
     if (!user) {
-      // Если пользователь не существует, создаем его со всеми баллами
+      // Если пользователь не существует, создаем его с баллами за NFT
       user = await prisma.user.create({
         data: {
           walletAddress,
           hasPurchasedNft: true,
-          points: totalPoints
+          points: totalNftPoints
         }
       });
       
-      console.log(`Создан новый пользователь ${walletAddress} с ${totalPoints} баллами (синхронизация)`);
+      console.log(`Создан новый пользователь ${walletAddress} с ${totalNftPoints} баллами (синхронизация)`);
       
       // Записываем данные о владении NFT для всех имеющихся токенов
       for (let i = 0; i < (nfts.NFT1 || 0); i++) {
@@ -94,50 +97,57 @@ export async function POST(request: NextRequest) {
         });
       }
     } else {
-      // Если у пользователя уже есть баллы, проверяем сколько у него должно быть всего
-      // по всем имеющимся NFT, и если текущих меньше, добавляем разницу
+      // Для существующего пользователя - сохраняем текущие баллы
+      // и добавляем только баллы за новые NFT
       
-      // Сначала проверяем существующие покупки
-      const expectedTotal = totalPoints;
+      // Получаем текущие записи о NFT
+      const existingPurchases = await prisma.nftPurchase.findMany({
+        where: { userId: user.id }
+      });
       
-      // Проверяем текущее количество баллов
-      const currentPoints = user.points || 0;
+      // Считаем, сколько каких NFT уже записано
+      const existingNfts = {
+        NFT1: 0,
+        NFT2: 0,
+        NFT3: 0
+      };
       
-      // Если у пользователя меньше баллов, чем должно быть, добавляем разницу
-      if (currentPoints < expectedTotal) {
-        const pointsToAdd = expectedTotal - currentPoints;
-        
+      existingPurchases.forEach(p => {
+        if (p.nftId === 'NFT1') existingNfts.NFT1++;
+        if (p.nftId === 'NFT2') existingNfts.NFT2++;
+        if (p.nftId === 'NFT3') existingNfts.NFT3++;
+      });
+      
+      // Рассчитываем баллы за существующие NFT
+      const existingNftPoints = 
+        existingNfts.NFT1 * 10 + 
+        existingNfts.NFT2 * 20 + 
+        existingNfts.NFT3 * 50;
+      
+      // Рассчитываем баллы за новые NFT
+      const newNft1 = Math.max(0, (nfts.NFT1 || 0) - existingNfts.NFT1);
+      const newNft2 = Math.max(0, (nfts.NFT2 || 0) - existingNfts.NFT2);
+      const newNft3 = Math.max(0, (nfts.NFT3 || 0) - existingNfts.NFT3);
+      
+      const newNftPoints = newNft1 * 10 + newNft2 * 20 + newNft3 * 50;
+      
+      console.log(`Обнаружены новые NFT: ${newNft1}x NFT1, ${newNft2}x NFT2, ${newNft3}x NFT3`);
+      console.log(`Баллы за новые NFT: ${newNftPoints}`);
+      
+      if (newNftPoints > 0) {
+        // Обновляем только если есть новые NFT, добавляя баллы к существующим
         user = await prisma.user.update({
           where: { id: user.id },
           data: { 
             hasPurchasedNft: true,
-            points: expectedTotal
+            points: { increment: newNftPoints }
           }
         });
         
-        console.log(`Обновлены баллы пользователя ${walletAddress}, установлено: ${expectedTotal} (было ${currentPoints})`);
+        console.log(`Добавлено ${newNftPoints} баллов пользователю ${walletAddress}`);
         
-        // Обновляем информацию о покупках NFT в базе данных
-        // Получаем текущие записи
-        const existingPurchases = await prisma.nftPurchase.findMany({
-          where: { userId: user.id }
-        });
-        
-        // Считаем, сколько каких NFT уже записано
-        const existingNfts = {
-          NFT1: 0,
-          NFT2: 0,
-          NFT3: 0
-        };
-        
-        existingPurchases.forEach(p => {
-          if (p.nftId === 'NFT1') existingNfts.NFT1++;
-          if (p.nftId === 'NFT2') existingNfts.NFT2++;
-          if (p.nftId === 'NFT3') existingNfts.NFT3++;
-        });
-        
-        // Добавляем записи о недостающих NFT
-        for (let i = existingNfts.NFT1; i < (nfts.NFT1 || 0); i++) {
+        // Добавляем записи о новых NFT
+        for (let i = 0; i < newNft1; i++) {
           await prisma.nftPurchase.create({
             data: {
               userId: user.id,
@@ -147,7 +157,7 @@ export async function POST(request: NextRequest) {
           });
         }
         
-        for (let i = existingNfts.NFT2; i < (nfts.NFT2 || 0); i++) {
+        for (let i = 0; i < newNft2; i++) {
           await prisma.nftPurchase.create({
             data: {
               userId: user.id,
@@ -157,7 +167,7 @@ export async function POST(request: NextRequest) {
           });
         }
         
-        for (let i = existingNfts.NFT3; i < (nfts.NFT3 || 0); i++) {
+        for (let i = 0; i < newNft3; i++) {
           await prisma.nftPurchase.create({
             data: {
               userId: user.id,
@@ -167,7 +177,7 @@ export async function POST(request: NextRequest) {
           });
         }
       } else {
-        console.log(`У пользователя ${walletAddress} уже достаточно баллов: ${currentPoints}`);
+        console.log(`У пользователя ${walletAddress} нет новых NFT, баллы не изменены`);
       }
     }
     
@@ -179,7 +189,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       walletAddress,
-      totalPoints: updatedUser?.points || totalPoints
+      totalPoints: updatedUser?.points || 0
     });
     
   } catch (error) {
