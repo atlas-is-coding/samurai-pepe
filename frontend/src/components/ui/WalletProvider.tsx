@@ -375,7 +375,7 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
           onClick={handleConnectClick}
           isPulse={isPulse}
         >
-          {connecting ? 'ПОДКЛЮЧЕНИЕ...' : 'CONNECT WALLET'}
+          {connecting ? 'CONNECTING...' : 'CONNECT WALLET'}
         </Button>
         
         {/* Original wallet connection button (hidden) */}

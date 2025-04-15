@@ -66,34 +66,34 @@ const TelegramAuthButton: React.FC<TelegramAuthButtonProps> = ({
             .then(res => res.json())
             .then(data => {
               if (data.success) {
-                toast.success('Аутентификация через Telegram успешна!');
+                toast.success('Telegram Auth Success!');
                 // Обновляем состояние UI, вызывая completeQuest из контекста
                 completeQuest(questId);
                 onSuccess?.(data);
               } else if (data.message === 'Quest already completed') {
-                toast.info('Этот квест уже выполнен');
+                toast.info('This quest is already completed');
                 // Даже если квест уже выполнен, обновляем UI
                 completeQuest(questId);
                 onSuccess?.(data);
               } else {
-                throw new Error(data.error || 'Ошибка выполнения квеста');
+                throw new Error(data.error || 'Quest completion error');
               }
             })
             .catch(error => {
-              console.error('Ошибка выполнения квеста:', error);
+              console.error('Quest completion error:', error);
               onError?.(error);
             });
           } else {
-            toast.error('Для выполнения квеста необходимо подключить кошелек');
+            toast.error('To complete the quest, you need to connect your wallet');
             onError?.(new Error('Wallet not connected'));
           }
         }
       }, 500);
       
     } catch (error) {
-      console.error('Ошибка при аутентификации через Telegram:', error);
+      console.error('Telegram Auth Error:', error);
       setIsAuthenticating(false);
-      toast.error('Ошибка при аутентификации через Telegram');
+      toast.error('Telegram Auth Error');
       onError?.(error);
     }
   };
@@ -104,7 +104,7 @@ const TelegramAuthButton: React.FC<TelegramAuthButtonProps> = ({
       disabled={isAuthenticating}
       className="bg-[#0088cc] hover:bg-[#0077b5] text-white"
     >
-      {isAuthenticating ? 'Выполняется...' : 'Подключить Telegram'}
+      {isAuthenticating ? 'Authenticating...' : 'Connect Telegram'}
     </Button>
   );
 };
