@@ -48,7 +48,7 @@ export function TeamSection() {
         ))}
       </div>
       
-      <p className="join-text">Join us on this extraordinary journey where ancient traditions meet the technology of the future!</p>
+      <p className="join-text">Join us on this extraordinary journey where ancient traditions meet the technology of the future!!!</p>
     </section>
   );
 }
