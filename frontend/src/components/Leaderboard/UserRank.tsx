@@ -3,7 +3,7 @@
 interface UserRankProps {
   rank: number;
   username: string;
-  invitedBy: string;
+  invitedBy: string; // Код приглашения, по которому был приглашен пользователь
   points: number;
   isCurrentUser?: boolean;
 }
@@ -42,7 +42,7 @@ export function UserRank({ rank, username, invitedBy, points, isCurrentUser = fa
           </div>
         </div>
       </td>
-      <td>{invitedBy}</td>
+      <td>{invitedBy || 'N/A'}</td>
       <td className="points-column">
         {points.toLocaleString()}
       </td>

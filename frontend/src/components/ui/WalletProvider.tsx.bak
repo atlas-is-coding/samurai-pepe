@@ -18,6 +18,7 @@ import { UserStats } from '../Home/UserStats';
 import { registerWalletTabsStateChangeCallback } from '../Quests/QuestsWidget';
 import { NFTMenu } from '../NFT/NFTMenu';
 import { useSolanaNft } from '@/context/SolanaNftProvider';
+import { useQuests } from '@/contexts/QuestsContext';
 
 // Import styles for wallet buttons
 import '@solana/wallet-adapter-react-ui/styles.css';
@@ -90,54 +91,6 @@ interface WalletInfoProps {
   isPulse?: boolean;
 }
 
-// Перед функцией WalletInfo добавляем переменные для хранения последнего известного состояния кошелька
-let lastKnownPublicKey: string | null = null;
-let lastKnownConnected: boolean = false;
-
-// Функция для сохранения последнего известного состояния кошелька
-function saveLastKnownWalletState(connected: boolean, publicKey: string | null) {
-  lastKnownPublicKey = publicKey;
-  lastKnownConnected = connected;
-  
-  // Также сохраняем в localStorage для более надежного хранения
-  try {
-    if (typeof window !== 'undefined') {
-      if (connected && publicKey) {
-        localStorage.setItem('last_known_wallet_connected', 'true');
-        localStorage.setItem('last_known_wallet_public_key', publicKey);
-      } else if (!connected) {
-        localStorage.setItem('last_known_wallet_connected', 'false');
-      }
-    }
-  } catch (e) {
-    console.error("Error saving to localStorage:", e);
-  }
-}
-
-// Функция для восстановления состояния кошелька
-function getLastKnownWalletState(): { connected: boolean, publicKey: string | null } {
-  // Сначала проверяем в памяти
-  if (lastKnownConnected && lastKnownPublicKey) {
-    return { connected: lastKnownConnected, publicKey: lastKnownPublicKey };
-  }
-  
-  // Затем проверяем localStorage
-  try {
-    if (typeof window !== 'undefined') {
-      const storedConnected = localStorage.getItem('last_known_wallet_connected') === 'true';
-      const storedPublicKey = localStorage.getItem('last_known_wallet_public_key');
-      
-      if (storedConnected && storedPublicKey) {
-        return { connected: storedConnected, publicKey: storedPublicKey };
-      }
-    }
-  } catch (e) {
-    console.error("Error reading from localStorage:", e);
-  }
-  
-  return { connected: false, publicKey: null };
-}
-
 // Компонент, отображающий информацию о кошельке
 function WalletInfo({ isPulse = true }: WalletInfoProps) {
   const { publicKey, connected, disconnect, connecting } = useWallet();
@@ -146,18 +99,25 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { ownedNFTs } = useSolanaNft();
+  const { ownedNFTs, totalPoints } = useSolanaNft();
+  const { quests, completeQuest, isQuestActive, isQuestCompleted } = useQuests();
   
   // Новое состояние для отображения меню NFT
   const [isNFTMenuVisible, setIsNFTMenuVisible] = useState(false);
   
-  // New state for invite code entry
+  // State for invite code entry
   const [inviteCode, setInviteCode] = useState('');
   const [isSubmittingCode, setIsSubmittingCode] = useState(false);
   const [codeSubmitError, setCodeSubmitError] = useState<string | null>(null);
   const [codeSubmitSuccess, setCodeSubmitSuccess] = useState(false);
   // State to track if user was already invited by someone
   const [isAlreadyInvited, setIsAlreadyInvited] = useState(false);
+  
+  // Добавляем новое состояние для хранения имени пользователя
+  const [nickname, setNickname] = useState('');
+  
+  // Добавляем состояние для активной вкладки квеста
+  const [activeQuest, setActiveQuest] = useState<number | null>(null);
 
   useEffect(() => {
     // Отправляем событие только при реальных изменениях состояния
@@ -294,6 +254,7 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
   // Закрытие модального окна
   const closeModal = () => {
     setIsModalVisible(false);
+    setActiveQuest(null);
   };
 
   // Обработка клавиши Escape для закрытия модального окна
@@ -379,18 +340,14 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
   };
 
   // В специальном эффекте для оповещения других компонентов о состоянии кошелька добавим сохранение состояния
-                  isRestoredState: true // добавляем флаг для обозначения восстановленного состояния
-                }
-              }));
-            } catch (e) {
-              console.error("Error dispatching restored state event:", e);
-            }
-          }, 100);
-          
-          // Возвращаемся, чтобы не отправлять текущее отключенное состояние
-          return;
-        }
-      }
+  useEffect(() => {
+    // Отправляем событие только если есть данные
+    if (typeof window !== 'undefined') {
+      console.log("WalletProvider: Wallet connection state:", { 
+        connected, 
+        publicKey: publicKey?.toString(),
+        connecting
+      });
       
       // Всегда отправляем событие при изменении состояния
       setTimeout(() => {
@@ -418,6 +375,19 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
     }
   }, [connected, publicKey, connecting]);
 
+  // Функция для выбора активного квеста
+  const handleQuestClick = (questId: number) => {
+    setActiveQuest(questId);
+  };
+
+  // Функция для выполнения квеста
+  const handleCompleteQuest = () => {
+    if (activeQuest !== null) {
+      completeQuest(activeQuest);
+      setActiveQuest(null);
+    }
+  };
+
   if (!connected) {
     return (
       <div className="wallet-connect-wrapper">
@@ -427,10 +397,9 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
           onClick={handleConnectClick}
           isPulse={isPulse}
         >
-          {connecting ? 'ПОДКЛЮЧЕНИЕ...' : 'CONNECT WALLET'}
+          {connecting ? 'CONNECTING...' : 'CONNECT WALLET'}
         </Button>
         
-        {/* Original wallet connection button (hidden) */}
         <div className="hidden-wallet-button">
           <WalletMultiButton />
         </div>
@@ -465,79 +434,157 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
         {/* Модальное окно с информацией о кошельке */}
         {isModalVisible && (
           <div className="wallet-modal-overlay" onClick={closeModal}>
-            <div className="wallet-modal" onClick={e => e.stopPropagation()}>
+            <div className="wallet-modal" onClick={(e) => e.stopPropagation()}>
               <div className="wallet-modal-header">
                 <button className="wallet-modal-close" onClick={closeModal}>×</button>
               </div>
               
               <div className="wallet-modal-content">
-                <div className="wallet-info-tab">
-                  <div className="menu-section">
-                    <div className="menu-item">
-                      <span className="menu-title">Address:</span>
-                      <span className="menu-value">{publicKey?.toString()}</span>
-                    </div>
-                    <div className="menu-item">
-                      <span className="menu-title">Balance:</span>
-                      {isLoading ? (
-                        <span className="menu-value">Loading...</span>
-                      ) : error ? (
-                        <span className="menu-value error">{error}</span>
-                      ) : (
-                        <span className="menu-value">{balance !== null ? balance.toFixed(4) : '0'} SOL</span>
-                      )}
+                <div className="wallet-tabs-container">
+                  {/* Левая часть с вкладками квестов */}
+                  <div className="wallet-tabs-sidebar">
+                    <div className="sidebar-header">
+                      <div className="avatar-container">
+                        <img src="/avatar-placeholder.png" alt="Avatar" className="avatar-image" />
+                      </div>
                     </div>
                     
-                    {/* User statistics information */}
-                    <UserStats />
-                    
-                    {/* Invite code input section - only show if not already invited */}
-                    {!isAlreadyInvited ? (
-                      <div className="menu-item invite-code-section">
-                        <span className="menu-title">Enter Invite Code:</span>
-                        <div className="invite-code-input-container">
-                          <input
-                            type="text"
-                            maxLength={6}
-                            placeholder="6-digit code"
-                            value={inviteCode}
-                            onChange={(e) => setInviteCode(e.target.value.trim())}
-                            className="invite-code-input"
-                          />
-                          <Button 
-                            onClick={handleSubmitInviteCode}
-                            disabled={isSubmittingCode || !inviteCode || inviteCode.length !== 6}
-                            className="submit-code-button"
-                          >
-                            {isSubmittingCode ? 'Submitting...' : 'Submit'}
-                          </Button>
+                    <div className="sidebar-quests">
+                      {quests.map(quest => (
+                        <div 
+                          key={quest.id}
+                          className={`sidebar-quest-item ${activeQuest === quest.id ? 'active' : ''} ${isQuestCompleted(quest.id) ? 'completed' : ''}`}
+                          onClick={() => handleQuestClick(quest.id)}
+                        >
+                          <div className="quest-icon">
+                            <img src={quest.icon} alt={quest.title} />
+                          </div>
+                          <div className="quest-title-small">{quest.title}</div>
+                          {isQuestCompleted(quest.id) && <div className="quest-completed-badge">✓</div>}
                         </div>
-                        {codeSubmitError && <div className="code-error">{codeSubmitError}</div>}
-                        {codeSubmitSuccess && <div className="code-success">Invite code applied successfully!</div>}
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Правая часть с информацией */}
+                  <div className="wallet-tabs-content">
+                    {activeQuest ? (
+                      // Отображение информации о выбранном квесте
+                      <div className="quest-details">
+                        <h3>{quests.find(q => q.id === activeQuest)?.title}</h3>
+                        <p>Complete this quest to earn {quests.find(q => q.id === activeQuest)?.points} points!</p>
+                        
+                        <Button 
+                          onClick={handleCompleteQuest} 
+                          disabled={!isQuestActive(activeQuest) || isQuestCompleted(activeQuest)}
+                          className="complete-quest-btn"
+                        >
+                          {isQuestCompleted(activeQuest) ? 'Completed' : 'Complete Quest'}
+                        </Button>
                       </div>
                     ) : (
-                      <div className="menu-item">
-                        <span className="menu-title">Invite Status:</span>
-                        <span className="menu-value invited-status">Already invited</span>
+                      // Основная информация
+                      <div className="wallet-info-tab">
+                        <div className="user-profile-section">
+                          <div className="name-field">
+                            <div className="name-label">NAME:</div>
+                            <input 
+                              type="text" 
+                              className="name-input" 
+                              value={nickname} 
+                              onChange={(e) => setNickname(e.target.value)}
+                              placeholder="Enter your nickname"
+                            />
+                          </div>
+                          
+                          <div className="points-field">
+                            <div className="points-label">POINTS:</div>
+                            <div className="points-value">{totalPoints.toLocaleString()}</div>
+                          </div>
+                        </div>
+                        
+                        <div className="collection-section">
+                          <div className="collection-header">×YOUR COLLECTION×</div>
+                          
+                          <div className="nft-cards-container">
+                            {Object.entries(ownedNFTs).length > 0 ? (
+                              Object.entries(ownedNFTs).map(([nftId, count]) => {
+                                const nftData = {
+                                  "NFT1": { name: "Kōjō", class: "common", max: 50 },
+                                  "NFT2": { name: "Daimyō", class: "rare", max: 25 },
+                                  "NFT3": { name: "Shōgun", class: "legendary", max: 10 }
+                                }[nftId] || { name: "Unknown", class: "unknown", max: 0 };
+                                
+                                return count > 0 ? (
+                                  <div key={nftId} className={`nft-card ${nftData.class}`}>
+                                    <div className="nft-card-name">{nftData.name}</div>
+                                  </div>
+                                ) : null;
+                              })
+                            ) : (
+                              <div className="no-nfts-message">No NFTs in your collection</div>
+                            )}
+                          </div>
+                          
+                          <div className="nft-collection-stats">
+                            <div className="nft-stat common">
+                              <div>Common</div>
+                              <div>[{ownedNFTs['NFT1'] || 0}/50]</div>
+                            </div>
+                            <div className="nft-stat rare">
+                              <div>Rare</div>
+                              <div>[{ownedNFTs['NFT2'] || 0}/25]</div>
+                            </div>
+                            <div className="nft-stat legendary">
+                              <div>Legendary</div>
+                              <div>[{ownedNFTs['NFT3'] || 0}/10]</div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Invite code section */}
+                        <div className="invite-code-section">
+                          <div className="invite-code-label">INVITE CODE:</div>
+                          <div className="invite-code-input-wrapper">
+                            <input 
+                              type="text" 
+                              className="invite-code-input" 
+                              value={inviteCode}
+                              onChange={(e) => setInviteCode(e.target.value.trim())}
+                              placeholder="/CODE-LINK/"
+                              maxLength={6}
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Buttons section */}
+                        <div className="wallet-buttons-section">
+                          <Button 
+                            className="get-invite-code-btn"
+                            disabled={Object.keys(ownedNFTs).length === 0}
+                          >
+                            Get Invite Code
+                          </Button>
+                          
+                          <Button 
+                            className="leaderboard-btn"
+                          >
+                            Leaderboard
+                          </Button>
+                          
+                          <Button 
+                            onClick={() => {
+                              clearAllCookies();
+                              disconnect();
+                              closeModal();
+                            }}
+                            className="disconnect-btn"
+                          >
+                            Disconnect
+                          </Button>
+                        </div>
                       </div>
                     )}
-                    
-                    {/* Button to get referral link */}
-                    <ReferralButton className="menu-item" />
-                    
-                    {/* Disconnect button */}
-                    <div className="menu-item">
-                      <Button 
-                        onClick={() => {
-                          clearAllCookies();
-                          disconnect();
-                          closeModal();
-                        }}
-                        className="disconnect-wallet-btn"
-                      >
-                        Disconnect Wallet
-                      </Button>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -582,131 +629,350 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
           background: rgba(0, 0, 0, 0.4);
         }
         
-        .disconnect-wallet-btn {
-          width: 100%;
-          margin-top: 10px;
-        }
-        
         .wallet-modal {
-          background: var(--dark-accent);
+          background: #000;
           border-radius: 15px;
           width: 95%;
-          max-width: 650px;
+          max-width: 700px;
           max-height: 90vh;
           overflow-y: auto;
           box-shadow: 0 15px 30px rgba(0, 0, 0, 0.7);
-          border: 2px solid var(--primary);
+          border: 2px solid #FFD700;
         }
         
         .wallet-modal-header {
           display: flex;
           justify-content: flex-end;
           align-items: center;
-          padding: 25px 30px;
-          border-bottom: 2px solid rgba(255, 215, 0, 0.4);
+          padding: 15px 20px;
+          position: relative;
         }
         
         .wallet-modal-close {
           background: none;
           border: none;
-          color: var(--primary);
+          color: #FFD700;
           font-size: 32px;
           cursor: pointer;
           padding: 0;
           line-height: 1;
+          position: absolute;
+          right: 20px;
+          top: 10px;
+          z-index: 10;
         }
         
         .wallet-modal-content {
-          padding: 30px;
+          padding: 0;
         }
         
-        .wallet-info-tab {
+        .wallet-tabs-container {
+          display: flex;
+          height: 500px;
+        }
+        
+        .wallet-tabs-sidebar {
+          width: 80px;
+          background: #1a1a1a;
+          border-right: 1px solid #333;
           display: flex;
           flex-direction: column;
-          gap: 22px;
         }
         
-        .menu-section {
-          max-height: 500px;
-          overflow-y: auto;
-          margin-bottom: 22px;
-        }
-        
-        .menu-item {
+        .sidebar-header {
+          padding: 15px 0;
           display: flex;
-          justify-content: space-between;
-          padding: 18px;
-          border-radius: 8px;
-          background: rgba(255, 255, 255, 0.07);
-          word-break: break-all;
-          font-size: 17px;
+          justify-content: center;
+          border-bottom: 1px solid #333;
+        }
+        
+        .avatar-container {
+          width: 50px;
+          height: 50px;
+          border-radius: 50%;
+          overflow: hidden;
+          border: 2px solid #FFD700;
+        }
+        
+        .avatar-image {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        
+        .sidebar-quests {
+          flex: 1;
+          overflow-y: auto;
+          padding: 10px 0;
+        }
+        
+        .sidebar-quest-item {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 10px 5px;
+          cursor: pointer;
+          position: relative;
+          transition: all 0.2s ease;
+          border-left: 3px solid transparent;
+        }
+        
+        .sidebar-quest-item.active {
+          background: rgba(255, 215, 0, 0.1);
+          border-left: 3px solid #FFD700;
+        }
+        
+        .sidebar-quest-item.completed {
+          border-left: 3px solid #51ff00;
+        }
+        
+        .quest-icon {
+          width: 30px;
+          height: 30px;
           margin-bottom: 5px;
         }
         
-        .menu-title {
-          font-weight: 600;
-          min-width: 120px;
-          color: var(--primary);
-          font-size: 17px;
+        .quest-icon img {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
         }
         
-        .menu-value {
-          color: white;
-          text-align: right;
+        .quest-title-small {
+          font-size: 10px;
+          color: #ccc;
+          text-align: center;
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        
+        .quest-completed-badge {
+          position: absolute;
+          top: 5px;
+          right: 5px;
+          width: 15px;
+          height: 15px;
+          background: #51ff00;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 10px;
+          color: #000;
+        }
+        
+        .wallet-tabs-content {
           flex: 1;
-          margin-left: 20px;
-          font-size: 16px;
+          padding: 20px;
+          overflow-y: auto;
+        }
+        
+        .quest-details {
+          padding: 20px;
+          background: rgba(0, 0, 0, 0.3);
+          border-radius: 10px;
+          border: 1px solid #333;
+        }
+        
+        .quest-details h3 {
+          color: #FFD700;
+          margin-top: 0;
+          margin-bottom: 15px;
+          font-size: 24px;
+        }
+        
+        .quest-details p {
+          color: #ccc;
+          margin-bottom: 20px;
+        }
+        
+        .complete-quest-btn {
+          width: 100%;
+        }
+        
+        .user-profile-section {
+          margin-bottom: 20px;
+        }
+        
+        .name-field, .points-field {
+          display: flex;
+          align-items: center;
+          margin-bottom: 15px;
+          border: 1px solid #FFD700;
+          border-radius: 5px;
+          padding: 5px 10px;
+          background: #111;
+        }
+        
+        .name-label, .points-label {
+          color: #FFD700;
+          font-weight: bold;
+          min-width: 80px;
+        }
+        
+        .name-input {
+          flex: 1;
+          background: transparent;
+          border: none;
+          color: white;
+          font-family: inherit;
+          padding: 5px;
+        }
+        
+        .name-input:focus {
+          outline: none;
+        }
+        
+        .points-value {
+          color: #51ff00;
+          font-weight: bold;
+          font-size: 20px;
+        }
+        
+        .collection-section {
+          margin-bottom: 20px;
+        }
+        
+        .collection-header {
+          text-align: center;
+          color: #FFD700;
+          font-weight: bold;
+          margin-bottom: 15px;
+          padding: 5px;
+          border: 1px solid #FFD700;
+          border-radius: 5px;
+          background: #111;
+        }
+        
+        .nft-cards-container {
+          display: flex;
+          justify-content: space-around;
+          margin-bottom: 15px;
+          min-height: 120px;
+        }
+        
+        .nft-card {
+          width: 100px;
+          height: 120px;
+          border-radius: 10px;
+          display: flex;
+          justify-content: center;
+          align-items: flex-end;
+          padding-bottom: 10px;
+          position: relative;
+          margin: 0 5px;
+        }
+        
+        .nft-card.common {
+          background: linear-gradient(to bottom, rgba(138, 43, 226, 0.3), rgba(138, 43, 226, 0.7));
+          border: 2px solid #8A2BE2;
+        }
+        
+        .nft-card.rare {
+          background: linear-gradient(to bottom, rgba(255, 0, 0, 0.3), rgba(255, 0, 0, 0.7));
+          border: 2px solid #FF0000;
+        }
+        
+        .nft-card.legendary {
+          background: linear-gradient(to bottom, rgba(255, 215, 0, 0.3), rgba(255, 215, 0, 0.7));
+          border: 2px solid #FFD700;
+        }
+        
+        .nft-card-name {
+          color: white;
+          font-size: 14px;
+          font-weight: bold;
+          text-align: center;
+        }
+        
+        .no-nfts-message {
+          color: #999;
+          text-align: center;
+          height: 120px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+        }
+        
+        .nft-collection-stats {
+          display: flex;
+          justify-content: space-around;
+        }
+        
+        .nft-stat {
+          text-align: center;
+          font-weight: bold;
+          width: 30%;
+        }
+        
+        .nft-stat.common {
+          color: #8A2BE2;
+        }
+        
+        .nft-stat.rare {
+          color: #FF0000;
+        }
+        
+        .nft-stat.legendary {
+          color: #FFD700;
         }
         
         .invite-code-section {
-          flex-direction: column;
-          align-items: stretch;
-          gap: 15px;
+          margin-bottom: 20px;
         }
         
-        .invite-code-input-container {
-          display: flex;
-          gap: 18px;
+        .invite-code-label {
+          color: #FFD700;
+          font-weight: bold;
+          margin-bottom: 5px;
+        }
+        
+        .invite-code-input-wrapper {
+          border: 1px solid #FFD700;
+          border-radius: 5px;
+          background: #111;
+          padding: 5px;
         }
         
         .invite-code-input {
-          flex: 1;
-          padding: 15px 18px;
-          background: rgba(255, 255, 255, 0.12);
-          border: 2px solid rgba(255, 215, 0, 0.4);
-          border-radius: 8px;
+          width: 100%;
+          background: transparent;
+          border: none;
           color: white;
-          font-family: 'Orbitron', sans-serif;
-          letter-spacing: 2px;
+          font-family: inherit;
+          padding: 5px;
           text-align: center;
-          font-size: 1.2rem;
         }
         
-        .submit-code-button {
-          padding: 15px 18px;
-          min-width: 140px;
-          font-size: 17px;
+        .invite-code-input:focus {
+          outline: none;
         }
         
-        .code-error {
-          color: #ff5555;
-          font-size: 1rem;
-          margin-top: 8px;
+        .wallet-buttons-section {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
         }
         
-        .code-success {
-          color: #51ff00;
-          font-size: 1rem;
-          margin-top: 8px;
-        }
-        
-        .error {
-          color: #ff4d4d;
-        }
-        
-        .invited-status {
-          color: #51ff00;
+        .get-invite-code-btn,
+        .leaderboard-btn,
+        .disconnect-btn {
+          width: 100%;
+          padding: 10px;
+          margin-bottom: 10px;
           font-weight: bold;
+        }
+        
+        .disconnect-btn {
+          background: #222;
+          color: #ccc;
+        }
+        
+        .disconnect-btn:hover {
+          background: #333;
         }
       `}</style>
       
@@ -719,20 +985,6 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
           display: flex;
           align-items: center;
           height: 60px;
-        }
-        
-        /* Глобальные стили для увеличения размера выпадающего меню */
-        .wallet-adapter-dropdown-list {
-          min-width: 320px !important;
-          padding: 20px !important;
-          grid-row-gap: 18px !important;
-        }
-        
-        .wallet-adapter-dropdown-list-item {
-          height: 55px !important;
-          font-size: 18px !important;
-          padding: 0 30px !important;
-          border-radius: 8px !important;
         }
       `}</style>
     </>

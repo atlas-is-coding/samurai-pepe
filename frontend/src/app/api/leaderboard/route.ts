@@ -47,14 +47,52 @@ export async function GET(request: NextRequest) {
       userRank = userCount + 1; // Rank is count of users with more points + 1
     }
     
+    // Получаем все коды приглашений для пользователей-приглашателей
+    const inviterCodes = new Map<string, string>();
+    
+    // Собираем все уникальные адреса приглашающих пользователей
+    const referrerAddresses = topUsers
+      .filter(user => user.referredBy)
+      .map(user => user.referredBy as string);
+    
+    if (referrerAddresses.length > 0) {
+      // Получаем коды приглашений для всех приглашающих пользователей
+      const referrers = await prisma.user.findMany({
+        where: {
+          walletAddress: {
+            in: referrerAddresses
+          }
+        },
+        select: {
+          walletAddress: true,
+          inviteCode: true
+        }
+      });
+      
+      // Создаем map адрес -> код приглашения
+      for (const referrer of referrers) {
+        if (referrer.walletAddress && referrer.inviteCode) {
+          inviterCodes.set(referrer.walletAddress, referrer.inviteCode);
+        }
+      }
+    }
+    
     // Map the data to include referral count and simplify structure
-    const formattedUsers = topUsers.map(user => ({
-      walletAddress: user.walletAddress,
-      points: user.points,
-      invitedBy: user.referredBy || null,
-      referralCount: user.userReferrals.length,
-      twitterUsername: user.twitterUsername || null,
-    }));
+    const formattedUsers = topUsers.map(user => {
+      // Если у пользователя есть приглашающий, получаем его код приглашения
+      let inviteCodeUsed = null;
+      if (user.referredBy) {
+        inviteCodeUsed = inviterCodes.get(user.referredBy) || user.referredBy;
+      }
+      
+      return {
+        walletAddress: user.walletAddress,
+        points: user.points,
+        invitedBy: inviteCodeUsed, // Используем код приглашения, а не адрес
+        referralCount: user.userReferrals.length,
+        twitterUsername: user.twitterUsername || null,
+      };
+    });
     
     return NextResponse.json({
       success: true,

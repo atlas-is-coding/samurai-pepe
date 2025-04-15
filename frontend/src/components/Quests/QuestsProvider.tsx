@@ -40,9 +40,9 @@ export function QuestsProvider({ children }: QuestsProviderProps) {
 
   // Список квестов
   const quests: Quest[] = [
-    { id: 1, title: 'Connect Twitter', points: 5, icon: '/q1.png' },
-    { id: 2, title: 'Connect Discord', points: 5, icon: '/q2.png' },
-    { id: 3, title: 'Connect Telegram', points: 5, icon: '/q3.png' },
+    { id: 1, title: 'Twitter Connect', points: 5, icon: '/q1.png' },
+    { id: 2, title: 'Discord Connect',  points: 5, icon: '/q2.png' },
+    { id: 3, title: 'Telegram Connect', points: 5, icon: '/q3.png' },
   ];
 
   // При подключении кошелька пытаемся получить данные о выполненных квестах
@@ -69,17 +69,33 @@ export function QuestsProvider({ children }: QuestsProviderProps) {
   }, [connected, publicKey]);
 
   // Обработчик завершения квеста
-  const completeQuest = (questId: number) => {
-    if (!isQuestActive(questId) || isQuestCompleted(questId)) return;
-    setCompletedQuests(prev => [...prev, questId]);
+  const completeQuest = async (questId: number) => {
+    if (!isQuestActive(questId) || isQuestCompleted(questId) || !publicKey) return;
     
-    // Дополнительно можно сделать запрос к API для обновления квестов,
-    // но это не обязательно, так как квест уже сохранен через API при выполнении
+    try {
+      // Вместо сразу установки квеста как выполненного, проверяем авторизацию
+      // Для этого делаем запрос к API, чтобы убедиться, что квест действительно выполнен
+      const response = await fetch(`/api/quests/complete?questId=${questId}&walletAddress=${publicKey.toString()}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setCompletedQuests(prev => [...prev, questId]);
+        }
+      }
+    } catch (error) {
+      console.error('Ошибка при выполнении квеста:', error);
+    }
   };
 
   // Проверка, активен ли квест (должны выполняться последовательно)
   const isQuestActive = (questId: number): boolean => {
+    // Первый квест всегда активен
     if (questId === 1) return true;
+    
+    // Для следующих квестов, проверяем, выполнен ли предыдущий
+    // Для квеста 2 (Discord) должен быть выполнен квест 1 (Twitter)
+    // Для квеста 3 (Telegram) должен быть выполнен квест 2 (Discord)
     return completedQuests.includes(questId - 1);
   };
 

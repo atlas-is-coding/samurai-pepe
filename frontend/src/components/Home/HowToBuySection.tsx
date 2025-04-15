@@ -42,7 +42,9 @@ export function HowToBuySection() {
       </div>
       
       <div className="cta-container">
-        <Button isPulse>Buy Samurai Pepe Now</Button>
+        <a href="#nft">
+          <Button isPulse>Buy Samurai Pepe Now</Button>
+        </a>
       </div>
     </section>
   );

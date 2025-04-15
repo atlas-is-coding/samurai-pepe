@@ -24,7 +24,7 @@ export function NftCollection() {
           <NftCard 
             type="legendary" 
             title="Shogun" 
-            videoSrc="/shogun-video.mp4"
+            videoSrc="/shogun-i"
             price={2}
           />
         </div>

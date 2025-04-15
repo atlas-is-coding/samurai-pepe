@@ -65,7 +65,7 @@ export class NftService {
       // Проверяем наличие каждого NFT по названиям в коллекции
       const nft1Count = userNFTs.filter(nft => 
         nft.collection?.address.toBase58() === NFT_ADDRESSES.NFT1 && 
-        nft.name?.includes('Kōjō')).length;
+        nft.name?.includes('Shogun')).length;
       
       const nft2Count = userNFTs.filter(nft => 
         nft.collection?.address.toBase58() === NFT_ADDRESSES.NFT2 && 

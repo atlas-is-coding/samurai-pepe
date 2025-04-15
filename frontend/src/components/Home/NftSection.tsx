@@ -83,6 +83,20 @@ export function NftSection() {
             // Преобразуем строку в PublicKey
             const key = new PublicKey(publicKey);
             setWalletPublicKey(key);
+
+            // Если тип кошелька еще не определен, попробуем определить его
+            if (typeof window !== 'undefined' && !window.__WALLET_TYPE__) {
+              // Проверяем доступные кошельки
+              if (window.solana && window.solana.isPhantom && 
+                  window.solana.publicKey && window.solana.publicKey.toString() === publicKey) {
+                console.log("Detected wallet type: phantom");
+                window.__WALLET_TYPE__ = 'phantom';
+              } else if (window.solflare && window.solflare.isSolflare && 
+                         window.solflare.publicKey && window.solflare.publicKey.toString() === publicKey) {
+                console.log("Detected wallet type: solflare");
+                window.__WALLET_TYPE__ = 'solflare';
+              }
+            }
           } catch (e) {
             console.error("Failed to parse public key:", e);
           }
@@ -122,6 +136,20 @@ export function NftSection() {
           try {
             const pubKey = new PublicKey(window.__WALLET_PUBLIC_KEY__);
             setWalletPublicKey(pubKey);
+
+            // Проверяем тип кошелька если он еще не определен
+            if (!window.__WALLET_TYPE__) {
+              // Пытаемся определить тип кошелька
+              if (window.solana && window.solana.isPhantom && 
+                  window.solana.publicKey && window.solana.publicKey.toString() === window.__WALLET_PUBLIC_KEY__) {
+                console.log("Detected wallet type from global state: phantom");
+                window.__WALLET_TYPE__ = 'phantom';
+              } else if (window.solflare && window.solflare.isSolflare && 
+                         window.solflare.publicKey && window.solflare.publicKey.toString() === window.__WALLET_PUBLIC_KEY__) {
+                console.log("Detected wallet type from global state: solflare");
+                window.__WALLET_TYPE__ = 'solflare';
+              }
+            }
           } catch (e) {
             console.error("Failed to parse global public key:", e);
           }
@@ -193,59 +221,94 @@ export function NftSection() {
     };
   }, []);
   
-  // Функция для прямого подключения через Phantom
-  const connectWithPhantom = async () => {
+  // Функция для прямого подключения через поддерживаемые кошельки
+  const connectWithWallet = async () => {
     try {
-      if (typeof window === 'undefined' || !window.solana) {
-        alert('Phantom wallet not found! Please install the Phantom extension');
-        return;
-      }
-      
       // Проверяем, что кошелек уже не подключен
       if (!walletConnected && !walletPublicKey) {
-        console.log("Connecting with Phantom directly...");
-        
-        // Запрашиваем соединение
-        await window.solana.connect();
-        
-        // Получаем публичный ключ
-        const phantom = window.solana;
-        
-        if (phantom.isPhantom && phantom.publicKey) {
-          console.log("Connected to Phantom:", phantom.publicKey.toString());
+        // Пробуем Phantom
+        if (typeof window !== 'undefined' && window.solana) {
+          console.log("Connecting with Phantom...");
           
-          // Обновляем локальное состояние
-          setWalletConnected(true);
-          setWalletPublicKey(phantom.publicKey);
-          
-          // Обновляем глобальное состояние
-          window.__WALLET_CONNECTED__ = true;
-          window.__WALLET_PUBLIC_KEY__ = phantom.publicKey.toString();
-          
-          // Принудительно обновляем UI
-          forceUpdate();
+          try {
+            // Запрашиваем соединение
+            await window.solana.connect();
+            
+            // Получаем публичный ключ
+            const phantom = window.solana;
+            
+            if (phantom.isPhantom && phantom.publicKey) {
+              console.log("Connected to Phantom:", phantom.publicKey.toString());
+              
+              // Обновляем локальное состояние
+              setWalletConnected(true);
+              setWalletPublicKey(phantom.publicKey);
+              
+              // Обновляем глобальное состояние
+              window.__WALLET_CONNECTED__ = true;
+              window.__WALLET_PUBLIC_KEY__ = phantom.publicKey.toString();
+              window.__WALLET_TYPE__ = 'phantom'; // Сохраняем тип кошелька
+              
+              // Принудительно обновляем UI
+              forceUpdate();
+              return true;
+            }
+          } catch (error) {
+            console.error("Error connecting with Phantom:", error);
+          }
         }
+        
+        // Пробуем Solflare
+        if (typeof window !== 'undefined' && window.solflare) {
+          console.log("Connecting with Solflare...");
+          
+          try {
+            // Запрашиваем соединение
+            await window.solflare.connect();
+            
+            // Получаем публичный ключ
+            const solflare = window.solflare;
+            
+            if (solflare.isSolflare && solflare.publicKey) {
+              console.log("Connected to Solflare:", solflare.publicKey.toString());
+              
+              // Обновляем локальное состояние
+              setWalletConnected(true);
+              setWalletPublicKey(solflare.publicKey);
+              
+              // Обновляем глобальное состояние
+              window.__WALLET_CONNECTED__ = true;
+              window.__WALLET_PUBLIC_KEY__ = solflare.publicKey.toString();
+              window.__WALLET_TYPE__ = 'solflare'; // Сохраняем тип кошелька
+              
+              // Принудительно обновляем UI
+              forceUpdate();
+              return true;
+            }
+          } catch (error) {
+            console.error("Error connecting with Solflare:", error);
+          }
+        }
+        
+        // Если ни один из кошельков не найден
+        alert('Wallet extension not found! Please install Phantom or Solflare extension');
       }
     } catch (error) {
-      console.error("Error connecting with Phantom:", error);
-    }
-  };
-
-  // Обновленная функция для минтинга NFT с прямой поддержкой Phantom
-  const mintWithPhantom = async (nftId: string) => {
-    // Проверяем, что Phantom доступен
-    if (typeof window === 'undefined' || !window.solana || !window.solana.isPhantom) {
-      toast.error("Phantom wallet not found! Please install the Phantom extension");
-      return;
+      console.error("Error connecting with wallet:", error);
     }
     
+    return false;
+  };
+
+  // Обновленная функция для минтинга NFT с поддержкой всех кошельков
+  const mintWithWallet = async (nftId: string) => {
     // Проверяем, является ли кошелек подключенным
     if (!walletConnected || !walletPublicKey) {
       // Пробуем подключить
-      await connectWithPhantom();
+      const connected = await connectWithWallet();
       
       // Проверяем снова после подключения
-      if (!walletConnected || !walletPublicKey) {
+      if (!connected) {
         toast.error("Please connect your wallet first");
         return;
       }
@@ -284,7 +347,7 @@ export function NftSection() {
         });
       }
     } catch (error) {
-      console.error('Error in mintWithPhantom:', error);
+      console.error('Error in mintWithWallet:', error);
       setMintStatus({
         status: 'error',
         nftId,
@@ -348,7 +411,8 @@ export function NftSection() {
     if (typeof window !== 'undefined' && window.__WALLET_CONNECTED__ && window.__WALLET_PUBLIC_KEY__) {
       console.log("Refreshing from global state:", {
         connected: window.__WALLET_CONNECTED__,
-        publicKey: window.__WALLET_PUBLIC_KEY__
+        publicKey: window.__WALLET_PUBLIC_KEY__,
+        walletType: window.__WALLET_TYPE__ || 'unknown'
       });
       
       setWalletConnected(window.__WALLET_CONNECTED__);
@@ -356,6 +420,20 @@ export function NftSection() {
       try {
         const pubKey = new PublicKey(window.__WALLET_PUBLIC_KEY__);
         setWalletPublicKey(pubKey);
+        
+        // Определяем тип кошелька, если он не определен
+        if (!window.__WALLET_TYPE__) {
+          if (window.solana && window.solana.isPhantom && 
+              window.solana.publicKey && window.solana.publicKey.toString() === window.__WALLET_PUBLIC_KEY__) {
+            console.log("Setting wallet type during refresh: phantom");
+            window.__WALLET_TYPE__ = 'phantom';
+          } else if (window.solflare && window.solflare.isSolflare && 
+                     window.solflare.publicKey && window.solflare.publicKey.toString() === window.__WALLET_PUBLIC_KEY__) {
+            console.log("Setting wallet type during refresh: solflare");
+            window.__WALLET_TYPE__ = 'solflare';
+          }
+        }
+        
         forceUpdate();
       } catch (e) {
         console.error("Error parsing public key:", e);
@@ -368,6 +446,20 @@ export function NftSection() {
       
       setWalletConnected(wallet.connected);
       setWalletPublicKey(wallet.publicKey);
+      
+      // Определяем тип кошелька
+      if (typeof window !== 'undefined' && !window.__WALLET_TYPE__) {
+        if (window.solana && window.solana.isPhantom && 
+            window.solana.publicKey && window.solana.publicKey.toString() === wallet.publicKey.toString()) {
+          console.log("Setting wallet type during refresh from hook: phantom");
+          window.__WALLET_TYPE__ = 'phantom';
+        } else if (window.solflare && window.solflare.isSolflare && 
+                   window.solflare.publicKey && window.solflare.publicKey.toString() === wallet.publicKey.toString()) {
+          console.log("Setting wallet type during refresh from hook: solflare");
+          window.__WALLET_TYPE__ = 'solflare';
+        }
+      }
+      
       forceUpdate();
     } else {
       console.log("No connected wallet found to refresh from");
@@ -417,7 +509,7 @@ export function NftSection() {
                   <div className="mint-button-container">
                     <button 
                       className={`mint-button ${card.type}`}
-                      onClick={() => mintWithPhantom(card.nftId)}
+                      onClick={() => mintWithWallet(card.nftId)}
                     >
                       {!walletConnected
                         ? 'Connect wallet' 

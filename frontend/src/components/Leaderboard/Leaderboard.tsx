@@ -210,8 +210,8 @@ export function Leaderboard() {
               <thead>
                 <tr>
                   <th>Rank</th>
-                  <th>Address</th>
-                  <th>Invited By</th>
+                  <th className="address-column">Address</th>
+                  <th>Invite Code Used</th>
                   <th className="points-column">Points</th>
                 </tr>
               </thead>
@@ -236,7 +236,7 @@ export function Leaderboard() {
                         </div>
                       </div>
                     </td>
-                    <td>{currentUser?.invitedBy ? shortenAddress(currentUser.invitedBy) : 'N/A'}</td>
+                    <td>{currentUser?.invitedBy || 'N/A'}</td>
                     <td className="points-column">
                       {currentUser?.points !== undefined ? currentUser.points.toLocaleString() : '0'}
                     </td>
@@ -274,7 +274,7 @@ export function Leaderboard() {
                             </div>
                           </div>
                         </td>
-                        <td>{user.invitedBy ? shortenAddress(user.invitedBy) : 'N/A'}</td>
+                        <td>{user.invitedBy || 'N/A'}</td>
                         <td className="points-column">
                           {user.points.toLocaleString()}
                         </td>
@@ -296,6 +296,21 @@ export function Leaderboard() {
           <RecentJoins joins={recentJoins} />
         </div>
       )}
+      
+      {/* Глобальные стили для скрытия wallet-header на мобильных экранах */}
+      <style jsx global>{`
+        @media (max-width: 768px) {
+          .wallet-header {
+            display: none !important;
+          }
+          
+          /* Убедимся, что столбец Address видим */
+          .address-column,
+          .leaderboard-table td:nth-child(2) {
+            display: table-cell !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

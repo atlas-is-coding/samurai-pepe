@@ -25,20 +25,26 @@ export function activateWalletTab(tab: string) {
 
 export function QuestsWidget() {
   const { connected, publicKey } = useWallet();
-  const { quests, completedQuests } = useQuests();
+  const { quests, completedQuests, isQuestActive, isQuestCompleted } = useQuests();
   const [showReferralLink, setShowReferralLink] = useState(false);
   const [showNFTPopup, setShowNFTPopup] = useState(false);
   
-  // Функция для открытия модального окна кошелька
-  const handleQuestsClick = () => {
+  // Функция для открытия модального окна кошелька с определенным квестом
+  const handleQuestClick = (questId: number) => {
     // Находим кнопку кошелька и программно кликаем на неё
     const walletButton = document.querySelector('.connect-wallet-btn');
     if (walletButton instanceof HTMLElement) {
+      // Устанавливаем активный квест перед открытием модального окна
+      localStorage.setItem('activeQuest', questId.toString());
+      
       walletButton.click();
       
-      // Открываем модальное окно
+      // Открываем модальное окно и активируем вкладку с квестами
       setTimeout(() => {
-        activateWalletTab('info');
+        // Уведомляем об изменении активного квеста
+        if (walletTabsStateChangeCallback) {
+          walletTabsStateChangeCallback(`quest-${questId}`);
+        }
       }, 100);
     } else {
       alert('Кошелек не найден. Пожалуйста, перезагрузите страницу.');
@@ -67,8 +73,35 @@ export function QuestsWidget() {
   return (
     <div className="quests-widget">
       <div className="quests-widget-header">
-        <div className="quests-title">QUESTS:</div>
-        <div className="quests-counter">{completedQuests.length}/{quests.length}</div>
+        <h3>Available Quests</h3>
+      </div>
+      
+      <div className="quests-list">
+        {quests.map(quest => (
+          <div 
+            key={quest.id}
+            className={`quest-item ${quest.id === 1 || isQuestActive(quest.id) ? 'active' : 'inactive'} ${isQuestCompleted(quest.id) ? 'completed' : ''}`}
+            onClick={() => (quest.id === 1 || isQuestActive(quest.id)) && handleQuestClick(quest.id)}
+            data-quest-id={quest.id}
+          >
+            <div className="quest-icon">
+              <img src={quest.icon} alt={quest.title} />
+            </div>
+            <div className="quest-info">
+              <div className="quest-title">{quest.title}</div>
+              <div className="quest-points">+{quest.points} points</div>
+            </div>
+            <div className="quest-status">
+              {isQuestCompleted(quest.id) ? (
+                <div className="completed-icon">✓</div>
+              ) : quest.id === 1 || isQuestActive(quest.id) ? (
+                <div className="action-icon">→</div>
+              ) : (
+                <div className="locked-icon">🔒</div>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
       
       <div className="quests-widget-buttons">
@@ -76,7 +109,7 @@ export function QuestsWidget() {
           MY NFTs
         </Button>
         
-        <Button onClick={handleQuestsClick} className="quests-button">
+        <Button onClick={() => handleQuestClick(1)} className="quests-button">
           QUESTS
         </Button>
         
@@ -153,6 +186,39 @@ export function QuestsWidget() {
           .quests-widget {
             max-width: 100%;
           }
+        }
+        
+        .quest-item {
+          display: flex;
+          align-items: center;
+          padding: 12px;
+          background: rgba(0, 0, 0, 0.3);
+          border-radius: 8px;
+          margin-bottom: 8px;
+          transition: all 0.3s ease;
+          border: 1px solid;
+          cursor: pointer;
+        }
+        
+        .active {
+          border-color: var(--primary, #FFD700);
+          background: rgba(30, 30, 30, 0.8);
+        }
+        
+        .inactive {
+          border-color: #555;
+          filter: grayscale(100%);
+          opacity: 0.7;
+          cursor: not-allowed;
+        }
+        
+        /* Стили для первого квеста - всегда активный */
+        .quest-item[data-quest-id="1"] {
+          border-color: var(--primary, #FFD700) !important;
+          background: rgba(30, 30, 30, 0.8) !important;
+          filter: none !important;
+          opacity: 1 !important;
+          cursor: pointer !important;
         }
       `}</style>
     </div>
