@@ -75,9 +75,11 @@ async function completeQuest(walletAddress: string, questId: number) {
   if (existingQuest) {
     console.log(`Квест уже выполнен: ${existingQuest.id}`);
     return NextResponse.json({ 
+      success: true, 
       message: 'Quest already completed',
       questId,
-      userId: user.id
+      userId: user.id,
+      questCompletionId: existingQuest.id
     });
   }
   

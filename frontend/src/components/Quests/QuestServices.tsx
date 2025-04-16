@@ -353,7 +353,7 @@ export const QuestServices = {
   // Сохранение выполненного квеста
   saveCompletedQuest: async (walletAddress: string, questId: number, twitterUsername?: string): Promise<boolean> => {
     try {
-      console.log(`Saving completed quest ${questId} for wallet ${walletAddress}`);
+      console.log(`QuestServices: Saving completed quest ${questId} for wallet ${walletAddress}`);
       
       // Запрос в API для сохранения выполненного квеста
       const response = await fetch('/api/quests/complete', {
@@ -370,23 +370,69 @@ export const QuestServices = {
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`Failed to save quest ${questId}:`, errorText);
+        console.error(`QuestServices: Failed to save quest ${questId}:`, errorText);
         throw new Error(`Failed to save completed quest: ${response.status}`);
       }
       
       const data = await response.json();
-      console.log(`Quest ${questId} completion result:`, data);
+      console.log(`QuestServices: Quest ${questId} completion result:`, data);
       
       if (data.success) {
-        // Отправляем событие о выполнении квеста
+        console.log(`QuestServices: Successfully completed quest ${questId}, dispatching events...`);
+        
+        // Dispatch multiple events to ensure all components are notified
+        // 1. quest-completed event
         window.dispatchEvent(new CustomEvent('quest-completed', {
           detail: { questId, walletAddress }
         }));
+        
+        // 2. oauth-complete event for components listening to that
+        window.dispatchEvent(new CustomEvent('oauth-complete', {
+          detail: { questId, walletAddress }
+        }));
+        
+        // 3. A direct call to refresh completed quests
+        try {
+          console.log(`QuestServices: Explicitly refreshing quests after completion...`);
+          const refreshResponse = await fetch(`/api/quests?walletAddress=${encodeURIComponent(walletAddress)}`);
+          if (refreshResponse.ok) {
+            const refreshData = await refreshResponse.json();
+            console.log(`QuestServices: Latest completed quests:`, refreshData.completedQuests);
+            
+            // Store in localStorage as a backup
+            localStorage.setItem(
+              `completed_quests_${walletAddress}`,
+              JSON.stringify(refreshData.completedQuests)
+            );
+          }
+        } catch (refreshError) {
+          console.error('QuestServices: Error refreshing quests:', refreshError);
+        }
+        
+        // 4. Force UI update by dispatching a custom event
+        setTimeout(() => {
+          console.log(`QuestServices: Dispatching delayed UI update event`);
+          window.dispatchEvent(new CustomEvent('force-ui-update', {
+            detail: { questId, walletAddress, timestamp: Date.now() }
+          }));
+        }, 1000);
+        
+        return true;
+      } else if (data.message === 'Quest already completed') {
+        console.log(`QuestServices: Quest ${questId} was already completed`);
+        
+        // Even if already completed, dispatch events to refresh UI
+        window.dispatchEvent(new CustomEvent('quest-completed', {
+          detail: { questId, walletAddress }
+        }));
+        
+        return true;
       }
       
-      return data.success === true;
+      console.error(`QuestServices: API returned success=false for quest ${questId}`);
+      return false;
     } catch (error) {
-      console.error('Error saving completed quest:', error);
+      console.error('QuestServices: Error saving completed quest:', error);
       
       // Fallback к localStorage в случае ошибки
       try {
@@ -395,11 +441,13 @@ export const QuestServices = {
         
         // Если квест уже выполнен, не добавляем повторно
         if (completedQuests.includes(questId)) {
+          console.log(`QuestServices: Quest ${questId} already exists in localStorage`);
           return true;
         }
         
         // Добавляем новый выполненный квест
         const updatedQuests = [...completedQuests, questId];
+        console.log(`QuestServices: Saving to localStorage:`, updatedQuests);
         
         // Сохраняем в localStorage (в качестве резервного варианта)
         localStorage.setItem(
@@ -408,13 +456,14 @@ export const QuestServices = {
         );
         
         // Отправляем событие о выполнении квеста даже при использовании fallback
+        console.log(`QuestServices: Dispatching events from localStorage fallback`);
         window.dispatchEvent(new CustomEvent('quest-completed', {
           detail: { questId, walletAddress }
         }));
         
         return true;
       } catch (localError) {
-        console.error('Error with localStorage fallback:', localError);
+        console.error('QuestServices: Error with localStorage fallback:', localError);
         return false;
       }
     }

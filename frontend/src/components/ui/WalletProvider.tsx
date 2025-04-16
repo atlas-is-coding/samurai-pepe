@@ -1187,7 +1187,9 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
       setIsLoading(true);
       
       try {
-        console.log(`Attempting to complete quest ${activeQuest} for wallet ${publicKey.toString()}`);
+        console.log(`WalletInfo: Attempting to complete quest ${activeQuest} for wallet ${publicKey.toString()}`);
+        console.log(`WalletInfo: Current quest state - isCompleted: ${isQuestCompleted(activeQuest)}, isActive: ${isQuestActive(activeQuest)}`);
+        
         // Вызываем соответствующий сервис в зависимости от ID квеста
         let success = false;
         
@@ -1196,29 +1198,37 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
         
         switch (activeQuest) {
           case 1:
-            console.log('Initiating Twitter connection...');
+            console.log('WalletInfo: Initiating Twitter connection...');
             const twitterResult = await QuestServices.connectTwitter();
             success = twitterResult.success;
-            console.log('Twitter connection result:', twitterResult);
+            console.log('WalletInfo: Twitter connection result:', twitterResult);
             break;
           case 2:
-            console.log('Initiating Discord connection...');
+            console.log('WalletInfo: Initiating Discord connection...');
             const discordResult = await QuestServices.connectDiscord();
             success = discordResult.success;
-            console.log('Discord connection result:', discordResult);
+            console.log('WalletInfo: Discord connection result:', discordResult);
             break;
           case 3:
-            console.log('Initiating Telegram connection...');
+            console.log('WalletInfo: Initiating Telegram connection...');
             const telegramResult = await QuestServices.connectTelegram();
             success = telegramResult.success;
-            console.log('Telegram connection result:', telegramResult);
+            console.log('WalletInfo: Telegram connection result:', telegramResult);
             break;
         }
         
         // Если авторизация прошла успешно, отмечаем квест как выполненный
         if (success) {
-          console.log(`Quest ${activeQuest} authorization successful, marking as completed...`);
+          console.log(`WalletInfo: Quest ${activeQuest} authorization successful, marking as completed...`);
+          
+          // Check current state before calling completeQuest
+          console.log(`WalletInfo: Before completeQuest - isQuestCompleted(${activeQuest}): ${isQuestCompleted(activeQuest)}`);
+          
+          // Call completeQuest to update state
           completeQuest(activeQuest);
+          
+          // Check if state was updated after completeQuest call
+          console.log(`WalletInfo: After completeQuest - isQuestCompleted(${activeQuest}): ${isQuestCompleted(activeQuest)}`);
           
           // Show success toast
           toast.success(`Quest completed successfully! You earned points!`);
@@ -1228,18 +1238,22 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
           
           // Wait a moment and then dispatch an event to refresh quest state
           setTimeout(() => {
+            console.log('WalletInfo: Dispatching quest-completed event to trigger UI refresh');
             window.dispatchEvent(new CustomEvent('quest-completed', {
               detail: { questId: activeQuest, walletAddress: publicKey.toString() }
             }));
+            
+            // Force component re-render by setting a state variable
+            setIsLoading(false);
           }, 500);
         } else {
-          console.log(`Quest ${activeQuest} authorization failed or was cancelled`);
+          console.log(`WalletInfo: Quest ${activeQuest} authorization failed or was cancelled`);
           toast.error('Quest completion failed or was cancelled');
+          setIsLoading(false);
         }
       } catch (error) {
-        console.error('Error completing quest:', error);
+        console.error('WalletInfo: Error completing quest:', error);
         toast.error('An error occurred while completing the quest');
-      } finally {
         setIsLoading(false);
       }
     }
@@ -1665,6 +1679,7 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
                           // Отображение информации о выбранном квесте
                           <div className="quest-details">
                             <button className="back-button" onClick={() => setActiveQuest(null)}>← Back to quests</button>
+                            {console.log(`WalletInfo: Rendering quest details for quest ID: ${activeQuest}, isCompleted: ${isQuestCompleted(activeQuest)}`)}
                             <h3>{quests.find(q => q.id === activeQuest)?.title}</h3>
                             <p>Complete this quest to earn {quests.find(q => q.id === activeQuest)?.points} points!</p>
                             
@@ -1681,6 +1696,7 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
                         ) : (
                           // Список всех квестов
                           <div className="quests-list">
+                            {console.log('WalletInfo: Rendering quests list, completed quests:', quests.map(q => ({id: q.id, completed: isQuestCompleted(q.id)})))}
                             {quests.map(quest => (
                               <div 
                                 key={quest.id}

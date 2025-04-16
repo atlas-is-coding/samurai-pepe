@@ -141,16 +141,25 @@ export async function GET(request: NextRequest) {
       let user = await prisma.user.findUnique({ where: { walletAddress } });
       
       if (user) {
+        console.log(`Twitter callback: Found user ${user.id} for wallet ${walletAddress}`);
+        
         // Обновляем имя пользователя Twitter
         await prisma.user.update({
           where: { id: user.id },
           data: { twitterUsername: twitterUser.username }
         });
         
+        console.log(`Twitter callback: Updated Twitter username to ${twitterUser.username}`);
+        
         // Используем новый API для выполнения квеста
         try {
+          console.log(`Twitter callback: Attempting to complete Twitter quest (ID: 1) for wallet ${walletAddress}`);
+          
           // Use a relative URL path for API calls on the server side
-          const questCompletionResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/quests/complete`, {
+          const completeQuestUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/quests/complete`;
+          console.log(`Twitter callback: Making request to ${completeQuestUrl}`);
+          
+          const questCompletionResponse = await fetch(completeQuestUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
@@ -161,18 +170,38 @@ export async function GET(request: NextRequest) {
             })
           });
           
+          console.log(`Twitter callback: Quest completion response status: ${questCompletionResponse.status}`);
+          
           if (!questCompletionResponse.ok) {
             const errorText = await questCompletionResponse.text();
-            console.error('Failed to complete Twitter quest:', errorText);
+            console.error('Twitter callback: Failed to complete Twitter quest:', errorText);
             throw new Error(`Failed to complete quest: ${questCompletionResponse.status}`);
           }
           
           const questResult = await questCompletionResponse.json();
-          console.log('Результат выполнения Twitter квеста:', questResult);
+          console.log('Twitter callback: Quest completion result:', questResult);
+          
+          // Verify quest completion by checking directly from the database
+          const verifyQuestCompletion = await prisma.questCompletion.findFirst({
+            where: {
+              userId: user.id,
+              questId: 1
+            }
+          });
+          
+          if (verifyQuestCompletion) {
+            console.log(`Twitter callback: Verified quest completion in database: ${verifyQuestCompletion.id}`);
+          } else {
+            console.error('Twitter callback: Quest completion verification failed - record not found in database');
+          }
         } catch (error) {
-          console.error('Ошибка при выполнении Twitter квеста:', error);
+          console.error('Twitter callback: Error completing Twitter quest:', error);
         }
+      } else {
+        console.log(`Twitter callback: No user found for wallet ${walletAddress}`);
       }
+    } else {
+      console.log('Twitter callback: No wallet address extracted from state');
     }
 
     // Создаем редирект обратно на клиент с параметрами успеха
