@@ -82,6 +82,13 @@ const PROGRAM_ID = new PublicKey('9uJ8yGTieFKj2f3XixAfuBAdFmavEoVNgCZgkcK56KrJ')
 // ID коллекции для генерации уникальных ID
 const COLLECTION_ID_BASE = Math.floor(Math.random() * 1000000) + 100;
 
+// Настройки баллов за NFT
+const NFT_POINTS = {
+  'NFT1': 100,  // Kōjō (Common)
+  'NFT2': 500,  // Daimyō (Rare)
+  'NFT3': 2500  // Shōgun (Legendary)
+};
+
 // Обновлённый тип контекста
 type SolanaNftContextType = {
   nfts: NFT[];
@@ -222,7 +229,7 @@ export function SolanaNftProvider({ children }: SolanaNftProviderProps) {
             if (walletType === 'solflare' && typeof window !== 'undefined' && window.solflare) {
               console.log("Using Solflare to sign transaction in Metaplex");
               return await window.solflare.signTransaction(transaction);
-            } else if (typeof window !== 'undefined' && window.solana) {
+            } else if (walletType === 'phantom' && typeof window !== 'undefined' && window.solana) {
               console.log("Using Phantom to sign transaction in Metaplex");
               return await window.solana.signTransaction(transaction);
             }
@@ -239,7 +246,7 @@ export function SolanaNftProvider({ children }: SolanaNftProviderProps) {
             
             if (walletType === 'solflare' && typeof window !== 'undefined' && window.solflare) {
               return await window.solflare.signAllTransactions(transactions);
-            } else if (typeof window !== 'undefined' && window.solana) {
+            } else if (walletType === 'phantom' && typeof window !== 'undefined' && window.solana) {
               return await window.solana.signAllTransactions(transactions);
             }
             
@@ -252,17 +259,53 @@ export function SolanaNftProvider({ children }: SolanaNftProviderProps) {
         metaplex.use({ install: (mx: any) => mx.identity(identity) });
       }
       
-      // Дополнительная проверка для Phantom кошелька
+      // Check for active wallet - prioritize wallet type from global state
       const walletType = typeof window !== 'undefined' ? window.__WALLET_TYPE__ : null;
       
-      if (walletType === 'phantom' && typeof window !== 'undefined' && window.solana?.publicKey) {
+      if (walletType === 'solflare' && typeof window !== 'undefined' && window.solflare?.publicKey) {
+        console.log("Checking Solflare wallet compatibility...");
+        
+        // If publicKey from useWallet doesn't match Solflare publicKey, create alternative Metaplex
+        if (!publicKey || publicKey.toString() !== window.solflare.publicKey.toString()) {
+          console.log("Creating alternative Solflare-specific Metaplex instance");
+          
+          // Create identity based on Solflare publicKey
+          const solflareIdentity = {
+            publicKey: window.solflare.publicKey,
+            signMessage: async () => {
+              throw new Error('signMessage not implemented');
+            },
+            signTransaction: async (transaction: Transaction) => {
+              if (window.solflare) {
+                return await window.solflare.signTransaction(transaction);
+              }
+              throw new Error('Solflare wallet not available');
+            },
+            signAllTransactions: async (transactions: Transaction[]) => {
+              if (window.solflare) {
+                return await window.solflare.signAllTransactions(transactions);
+              }
+              throw new Error('Solflare wallet not available');
+            },
+          };
+          
+          // Create a Metaplex with direct Solflare identity
+          try {
+            // @ts-ignore - Working around typing issues with Metaplex
+            metaplex.use({ install: (mx: any) => mx.identity(solflareIdentity) });
+            console.log("Successfully applied Solflare-specific identity to Metaplex");
+          } catch (err) {
+            console.error("Error applying Solflare identity:", err);
+          }
+        }
+      } else if (walletType === 'phantom' && typeof window !== 'undefined' && window.solana?.publicKey) {
         console.log("Checking Phantom wallet compatibility...");
         
-        // Если publicKey из useWallet не совпадает с Phantom publicKey, создаем альтернативный Metaplex
+        // If publicKey from useWallet doesn't match Phantom publicKey, create alternative Metaplex
         if (!publicKey || publicKey.toString() !== window.solana.publicKey.toString()) {
           console.log("Creating alternative Phantom-specific Metaplex instance");
           
-          // Создаем идентификацию на основе Phantom publicKey
+          // Create identity based on Phantom publicKey
           const phantomIdentity = {
             publicKey: window.solana.publicKey,
             signMessage: async () => {
@@ -282,9 +325,9 @@ export function SolanaNftProvider({ children }: SolanaNftProviderProps) {
             },
           };
           
-          // Создаем второй Metaplex с прямой идентификацией Phantom
+          // Create a second Metaplex with direct Phantom identity
           try {
-            // @ts-ignore - Обходим проблемы типизации с Metaplex
+            // @ts-ignore - Working around typing issues with Metaplex
             metaplex.use({ install: (mx: any) => mx.identity(phantomIdentity) });
             console.log("Successfully applied Phantom-specific identity to Metaplex");
           } catch (err) {
@@ -623,8 +666,12 @@ export function SolanaNftProvider({ children }: SolanaNftProviderProps) {
       // NFT3 доступно только если есть NFT1 и NFT2
       setIsNFT3Available(nft1Count > 0 && nft2Count > 0);
       
-      // Расчет общего количества поинтов (можно реализовать собственную логику)
-      setTotalPoints(nft1Count * 10 + nft2Count * 20 + nft3Count * 50);
+      // Расчет общего количества поинтов
+      setTotalPoints(
+        nft1Count * NFT_POINTS.NFT1 + 
+        nft2Count * NFT_POINTS.NFT2 + 
+        nft3Count * NFT_POINTS.NFT3
+      );
       
       // Собираем информацию о NFT для отображения
       const availableNFTs = [
@@ -864,7 +911,7 @@ export function SolanaNftProvider({ children }: SolanaNftProviderProps) {
               // Обновляем баллы пользователя через API
               try {
                 // Вычисляем баллы на основе типа NFT
-                const pointsToAdd = nftId === 'NFT1' ? 10 : nftId === 'NFT2' ? 20 : 50;
+                const pointsToAdd = NFT_POINTS[nftId as keyof typeof NFT_POINTS];
                 
                 const response = await fetch('/api/nft/update-points', {
                   method: 'POST',
@@ -873,8 +920,7 @@ export function SolanaNftProvider({ children }: SolanaNftProviderProps) {
                   },
                   body: JSON.stringify({
                     walletAddress: walletPublicKey.toString(),
-                    nftId,
-                    points: pointsToAdd
+                    nftId
                   })
                 });
                 
@@ -932,7 +978,7 @@ export function SolanaNftProvider({ children }: SolanaNftProviderProps) {
               // Обновляем баллы пользователя через API
               try {
                 // Вычисляем баллы на основе типа NFT
-                const pointsToAdd = nftId === 'NFT1' ? 10 : nftId === 'NFT2' ? 20 : 50;
+                const pointsToAdd = NFT_POINTS[nftId as keyof typeof NFT_POINTS];
                 
                 const response = await fetch('/api/nft/update-points', {
                   method: 'POST',
@@ -941,8 +987,7 @@ export function SolanaNftProvider({ children }: SolanaNftProviderProps) {
                   },
                   body: JSON.stringify({
                     walletAddress: walletPublicKey.toString(),
-                    nftId,
-                    points: pointsToAdd
+                    nftId
                   })
                 });
                 
@@ -999,7 +1044,7 @@ export function SolanaNftProvider({ children }: SolanaNftProviderProps) {
               // Обновляем баллы пользователя через API
               try {
                 // Вычисляем баллы на основе типа NFT
-                const pointsToAdd = nftId === 'NFT1' ? 10 : nftId === 'NFT2' ? 20 : 50;
+                const pointsToAdd = NFT_POINTS[nftId as keyof typeof NFT_POINTS];
                 
                 const response = await fetch('/api/nft/update-points', {
                   method: 'POST',
@@ -1008,8 +1053,7 @@ export function SolanaNftProvider({ children }: SolanaNftProviderProps) {
                   },
                   body: JSON.stringify({
                     walletAddress: walletPublicKey.toString(),
-                    nftId,
-                    points: pointsToAdd
+                    nftId
                   })
                 });
                 
@@ -1066,7 +1110,7 @@ export function SolanaNftProvider({ children }: SolanaNftProviderProps) {
           // Обновляем баллы пользователя через API
           try {
             // Вычисляем баллы на основе типа NFT
-            const pointsToAdd = nftId === 'NFT1' ? 10 : nftId === 'NFT2' ? 20 : 50;
+            const pointsToAdd = NFT_POINTS[nftId as keyof typeof NFT_POINTS];
             
             const response = await fetch('/api/nft/update-points', {
               method: 'POST',
@@ -1075,8 +1119,7 @@ export function SolanaNftProvider({ children }: SolanaNftProviderProps) {
               },
               body: JSON.stringify({
                 walletAddress: walletPublicKey.toString(),
-                nftId,
-                points: pointsToAdd
+                nftId
               })
             });
             

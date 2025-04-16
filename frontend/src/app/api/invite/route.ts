@@ -20,6 +20,12 @@ const trackInviteCodeSchema = z.object({
   inviteCode: z.string().length(6)
 });
 
+// Очки за приглашение
+const REFERRAL_POINTS = {
+  referrer: 10, // Приглашающий получает 10 очков
+  invitee: 5    // Приглашенный получает 5 очков
+};
+
 // Function to generate a random 6-digit code
 function generateRandomCode(): string {
   // Generate a random 6-digit number
@@ -363,27 +369,27 @@ export async function PUT(request: NextRequest) {
         referredAddress: walletAddress,
       },
     });
-    
+
     // Create referral log entry
     await prisma.referralLog.create({
       data: {
         referrerAddress,
         userAddress: walletAddress,
-        pointsAwarded: 10, // Referrer gets 10 points
+        pointsAwarded: REFERRAL_POINTS.referrer, // Referrer gets 10 points
         status: 'pending', // Status "pending" until NFT purchase
       },
     });
-    
+
     // Award 5 points to the invited user
     await prisma.user.update({
       where: { id: user.id },
-      data: { points: { increment: 5 } },
+      data: { points: { increment: REFERRAL_POINTS.invitee } },
     });
-    
+
     // Award 10 points to the referrer
     await prisma.user.update({
       where: { id: referrer.id },
-      data: { points: { increment: 10 } },
+      data: { points: { increment: REFERRAL_POINTS.referrer } },
     });
     
     // Update referrer statistics

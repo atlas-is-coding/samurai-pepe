@@ -58,6 +58,19 @@ export const QuestServices = {
               // Закрываем окно авторизации
               authWindow.close();
               
+              // После успешной авторизации, делаем проверку завершения квеста
+              // и запрашиваем обновление состояния квестов
+              QuestServices.saveCompletedQuest(walletAddress, 1, twitterUsername || undefined)
+                .then(success => {
+                  if (success) {
+                    // Dispatch event to notify components that OAuth is complete
+                    window.dispatchEvent(new CustomEvent('oauth-complete', {
+                      detail: { questId: 1, walletAddress }
+                    }));
+                  }
+                })
+                .catch(err => console.error('Error saving Twitter quest completion:', err));
+              
               // Возвращаем успешный результат
               resolve({ 
                 success: true, 
@@ -109,7 +122,7 @@ export const QuestServices = {
       
       // Открываем новое окно с URL для авторизации
       const width = 600;
-      const height = 700; // Discord требует немного больше места
+      const height = 600;
       const left = window.screenX + (window.outerWidth - width) / 2;
       const top = window.screenY + (window.outerHeight - height) / 2;
       
@@ -140,6 +153,19 @@ export const QuestServices = {
               
               // Закрываем окно авторизации
               authWindow.close();
+              
+              // После успешной авторизации, делаем проверку завершения квеста
+              // и запрашиваем обновление состояния квестов
+              QuestServices.saveCompletedQuest(walletAddress, 2)
+                .then(success => {
+                  if (success) {
+                    // Dispatch event to notify components that OAuth is complete
+                    window.dispatchEvent(new CustomEvent('oauth-complete', {
+                      detail: { questId: 2, walletAddress }
+                    }));
+                  }
+                })
+                .catch(err => console.error('Error saving Discord quest completion:', err));
               
               // Возвращаем успешный результат
               resolve({ success: true });
@@ -224,7 +250,23 @@ export const QuestServices = {
               fetch(`/api/quests/complete?questId=3&walletAddress=${encodeURIComponent(walletAddress)}`)
                 .then(res => res.json())
                 .then(data => {
-                  resolve({ success: data.completed });
+                  if (data.success || data.completed) {
+                    // After successful authorization, save quest completion
+                    QuestServices.saveCompletedQuest(walletAddress, 3)
+                      .then(success => {
+                        if (success) {
+                          // Dispatch event to notify components that OAuth is complete
+                          window.dispatchEvent(new CustomEvent('oauth-complete', {
+                            detail: { questId: 3, walletAddress }
+                          }));
+                        }
+                      })
+                      .catch(err => console.error('Error saving Telegram quest completion:', err));
+                    
+                    resolve({ success: true });
+                  } else {
+                    resolve({ success: false });
+                  }
                 })
                 .catch(() => {
                   resolve({ success: false });
@@ -242,6 +284,19 @@ export const QuestServices = {
               
               // Закрываем окно авторизации
               authWindow.close();
+              
+              // После успешной авторизации, делаем проверку завершения квеста
+              // и запрашиваем обновление состояния квестов
+              QuestServices.saveCompletedQuest(walletAddress, 3)
+                .then(success => {
+                  if (success) {
+                    // Dispatch event to notify components that OAuth is complete
+                    window.dispatchEvent(new CustomEvent('oauth-complete', {
+                      detail: { questId: 3, walletAddress }
+                    }));
+                  }
+                })
+                .catch(err => console.error('Error saving Telegram quest completion:', err));
               
               // Возвращаем успешный результат
               resolve({ success: true });
@@ -298,6 +353,8 @@ export const QuestServices = {
   // Сохранение выполненного квеста
   saveCompletedQuest: async (walletAddress: string, questId: number, twitterUsername?: string): Promise<boolean> => {
     try {
+      console.log(`Saving completed quest ${questId} for wallet ${walletAddress}`);
+      
       // Запрос в API для сохранения выполненного квеста
       const response = await fetch('/api/quests/complete', {
         method: 'POST',
@@ -312,11 +369,22 @@ export const QuestServices = {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to save completed quest');
+        const errorText = await response.text();
+        console.error(`Failed to save quest ${questId}:`, errorText);
+        throw new Error(`Failed to save completed quest: ${response.status}`);
       }
       
       const data = await response.json();
-      return data.success;
+      console.log(`Quest ${questId} completion result:`, data);
+      
+      if (data.success) {
+        // Отправляем событие о выполнении квеста
+        window.dispatchEvent(new CustomEvent('quest-completed', {
+          detail: { questId, walletAddress }
+        }));
+      }
+      
+      return data.success === true;
     } catch (error) {
       console.error('Error saving completed quest:', error);
       
@@ -338,6 +406,11 @@ export const QuestServices = {
           `completed_quests_${walletAddress}`,
           JSON.stringify(updatedQuests)
         );
+        
+        // Отправляем событие о выполнении квеста даже при использовании fallback
+        window.dispatchEvent(new CustomEvent('quest-completed', {
+          detail: { questId, walletAddress }
+        }));
         
         return true;
       } catch (localError) {

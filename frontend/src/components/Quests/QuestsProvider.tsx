@@ -66,6 +66,30 @@ export function QuestsProvider({ children }: QuestsProviderProps) {
     };
     
     fetchCompletedQuests();
+    
+    // Listen for wallet connection change events to refresh quests
+    const handleConnectionChange = () => {
+      console.log('Connection change detected, refreshing quests');
+      fetchCompletedQuests();
+    };
+    
+    // Listen for OAuth completion events to refresh quests
+    const handleOAuthComplete = (event: Event) => {
+      console.log('OAuth completion detected, refreshing quests');
+      fetchCompletedQuests();
+    };
+    
+    window.addEventListener('wallet-connection-change', handleConnectionChange);
+    window.addEventListener('oauth-complete', handleOAuthComplete);
+    
+    // Additional event listener for when coming back from oauth flow
+    window.addEventListener('focus', fetchCompletedQuests);
+    
+    return () => {
+      window.removeEventListener('wallet-connection-change', handleConnectionChange);
+      window.removeEventListener('oauth-complete', handleOAuthComplete);
+      window.removeEventListener('focus', fetchCompletedQuests);
+    };
   }, [connected, publicKey]);
 
   // Обработчик завершения квеста
@@ -73,14 +97,47 @@ export function QuestsProvider({ children }: QuestsProviderProps) {
     if (!isQuestActive(questId) || isQuestCompleted(questId) || !publicKey) return;
     
     try {
+      console.log(`Completing quest ${questId} for wallet ${publicKey.toString()}`);
+      
       // Вместо сразу установки квеста как выполненного, проверяем авторизацию
       // Для этого делаем запрос к API, чтобы убедиться, что квест действительно выполнен
       const response = await fetch(`/api/quests/complete?questId=${questId}&walletAddress=${publicKey.toString()}`);
       
       if (response.ok) {
         const data = await response.json();
+        console.log('Quest completion response:', data);
+        
+        // Manually trigger a refresh of the completed quests
+        const fetchLatestQuests = async () => {
+          try {
+            const walletAddress = publicKey.toString();
+            const response = await fetch(`/api/quests?walletAddress=${encodeURIComponent(walletAddress)}`);
+            
+            if (response.ok) {
+              const data = await response.json();
+              console.log('Refreshed completed quests:', data.completedQuests);
+              setCompletedQuests(data.completedQuests);
+            }
+          } catch (error) {
+            console.error('Error refreshing completed quests:', error);
+          }
+        };
+        
+        // If the API indicates success, update the state
         if (data.success) {
-          setCompletedQuests(prev => [...prev, questId]);
+          // Update state immediately for UI responsiveness
+          setCompletedQuests(prev => {
+            if (!prev.includes(questId)) {
+              return [...prev, questId];
+            }
+            return prev;
+          });
+          
+          // Then fetch the latest state from the server to ensure consistency
+          fetchLatestQuests();
+        } else {
+          // If the API returned ok but not success, fetch latest quests anyway
+          fetchLatestQuests();
         }
       }
     } catch (error) {

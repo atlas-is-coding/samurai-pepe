@@ -131,6 +131,9 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
   const [nicknameSubmitSuccess, setNicknameSubmitSuccess] = useState(false);
   const [nicknameSubmitError, setNicknameSubmitError] = useState<string | null>(null);
   
+  // State for active tab
+  const [activeTab, setActiveTab] = useState<'profile' | 'quests'>('profile');
+  
   // Добавляем состояние для активной вкладки квеста
   const [activeQuest, setActiveQuest] = useState<number | null>(null);
   
@@ -138,6 +141,11 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
   const [userInviteCode, setUserInviteCode] = useState<string | null>(null);
   const [isLoadingInviteCode, setIsLoadingInviteCode] = useState(false);
   const [inviteCodeError, setInviteCodeError] = useState<string | null>(null);
+  // State for invitation stats
+  const [referralStats, setReferralStats] = useState<{
+    count: number;
+    points: number;
+  } | null>(null);
 
   useEffect(() => {
     // Отправляем событие только при реальных изменениях состояния
@@ -381,17 +389,48 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
     }
   };
 
+  // Function to explicitly set wallet type cookie
+  function setWalletTypeCookie(walletType: string | undefined) {
+    if (walletType) {
+      console.log(`Setting wallet type cookie to: ${walletType}`);
+      document.cookie = `walletType=${walletType};path=/;max-age=86400`; // 24 hours expiry
+    } else {
+      console.log('Clearing wallet type cookie');
+      document.cookie = "walletType=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+    }
+  }
+
   /**
    * Clears all cookies from the document
    */
   function clearAllCookies() {
+    console.log("🍪 Clearing all cookies");
     const cookies = document.cookie.split(";");
+    
+    // Log existing cookies for debugging
+    console.log("Existing cookies:", cookies);
+    
+    // Check specifically for walletType cookie
+    const walletTypeCookie = cookies.find(c => c.trim().startsWith("walletType="));
+    if (walletTypeCookie) {
+      console.log("Found walletType cookie:", walletTypeCookie);
+    }
     
     for (let i = 0; i < cookies.length; i++) {
       const cookie = cookies[i];
       const eqPos = cookie.indexOf("=");
-      const name = eqPos > -1 ? cookie.substr(0, eqPos) : cookie;
+      const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+      console.log(`Removing cookie: ${name}`);
       document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+      
+      // Also try with domain parameter to ensure cookie is removed
+      document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=" + window.location.hostname;
+    }
+    
+    // Set wallet type cookie directly based on detected type
+    if (window.__WALLET_TYPE__) {
+      console.log(`Setting wallet type cookie directly to: ${window.__WALLET_TYPE__}`);
+      document.cookie = `walletType=${window.__WALLET_TYPE__};path=/`;
     }
     
     console.log("🍪 All cookies cleared");
@@ -400,14 +439,120 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
   // Добавляем константу для задержки повторных проверок
   const PHANTOM_RECONNECT_DELAY = 1000; // 1 секунда
 
+  // Handler for Solflare disconnect
+  const handleSolflareDisconnect = () => {
+    console.log('[WalletProvider] Solflare wallet disconnected');
+    resetWalletState();
+  };
+
+  // Handler for Solflare account change
+  const handleSolflareAccountChanged = (newPublicKey: { toString: () => string } | null) => {
+    console.log('[WalletProvider] Solflare account changed:', newPublicKey);
+    
+    if (!newPublicKey) {
+      resetWalletState();
+      return;
+    }
+    
+    const newKeyString = newPublicKey.toString();
+    setLocalPublicKey(newKeyString);
+    window.__WALLET_PUBLIC_KEY__ = newKeyString;
+    localStorage.setItem('walletPublicKey', newKeyString);
+    
+    // Force NFT refresh when account changes
+    window.forceNftRefresh = true;
+    
+    // Dispatch account change event
+    window.dispatchEvent(new CustomEvent('wallet-connection-change', {
+      detail: { publicKey: newKeyString, walletType: 'solflare' }
+    }));
+  };
+
   const connectPhantom = async () => {
     try {
       setIsLoading(true);
       window.__WALLET_CONNECTING__ = true;
       
+      // First check if Solflare is available and properly initialized
+      if (window.solflare && window.solflare.isSolflare) {
+        // User has Solflare extension
+        console.log('[WalletProvider] Detected Solflare wallet, using appropriate connection');
+        try {
+          // Similar pattern to Phantom connection but for Solflare
+          if (window.solflare.isConnected) {
+            console.log('[WalletProvider] Solflare already connected, getting public key');
+            const publicKey = window.solflare.publicKey?.toString();
+            
+            if (publicKey) {
+              console.log(`[WalletProvider] Solflare already connected with public key: ${publicKey}`);
+              setLocalPublicKey(publicKey);
+              window.__WALLET_PUBLIC_KEY__ = publicKey;
+              window.__WALLET_CONNECTED__ = true;
+              window.__WALLET_TYPE__ = 'solflare';
+              localStorage.setItem('walletType', 'solflare');
+              localStorage.setItem('walletPublicKey', publicKey);
+              
+              // Set wallet type cookie explicitly
+              setWalletTypeCookie('solflare');
+              
+              setWalletConnected(true);
+              
+              // Add Solflare event listeners
+              window.solflare?.on?.('disconnect', handleSolflareDisconnect);
+              window.solflare?.on?.('accountChanged', handleSolflareAccountChanged);
+              
+              // Dispatch connection event
+              window.dispatchEvent(new CustomEvent('wallet-connection-change', {
+                detail: { publicKey, connected: true, walletType: 'solflare' }
+              }));
+              
+              setIsLoading(false);
+              window.__WALLET_CONNECTING__ = false;
+              return;
+            }
+          }
+          
+          // Connect to Solflare
+          const response = await window.solflare.connect();
+          const responsePublicKey = response.publicKey.toString();
+          console.log(`[WalletProvider] Connected to Solflare with public key: ${responsePublicKey}`);
+          
+          setLocalPublicKey(responsePublicKey);
+          window.__WALLET_PUBLIC_KEY__ = responsePublicKey;
+          window.__WALLET_CONNECTED__ = true;
+          window.__WALLET_TYPE__ = 'solflare';
+          localStorage.setItem('walletType', 'solflare');
+          localStorage.setItem('walletPublicKey', responsePublicKey);
+          
+          // Set wallet type cookie explicitly
+          setWalletTypeCookie('solflare');
+          
+          window.forceNftRefresh = true;
+          setWalletConnected(true);
+          
+          // Add Solflare event listeners
+          window.solflare?.on?.('disconnect', handleSolflareDisconnect);
+          window.solflare?.on?.('accountChanged', handleSolflareAccountChanged);
+          
+          // Dispatch connection event
+          window.dispatchEvent(new CustomEvent('wallet-connection-change', {
+            detail: { publicKey: responsePublicKey, connected: true, walletType: 'solflare' }
+          }));
+          
+          setIsLoading(false);
+          window.__WALLET_CONNECTING__ = false;
+          return;
+        } catch (error) {
+          console.error('[WalletProvider] Error connecting to Solflare:', error);
+          toast.error('Error connecting to Solflare');
+          // Continue to try Phantom if Solflare fails
+        }
+      }
+      
+      // Original Phantom connection code
       // Проверяем наличие Phantom в окне
       if (!window.solana || !window.solana.isPhantom) {
-        toast.error('Phantom кошелёк не установлен');
+        toast.error('No compatible wallet found. Please install Phantom or Solflare wallet extension.');
         setIsLoading(false);
         window.__WALLET_CONNECTING__ = false;
         return;
@@ -429,6 +574,10 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
           window.phantomInitialized = true;
           localStorage.setItem('walletType', 'phantom');
           localStorage.setItem('walletPublicKey', publicKey);
+          
+          // Set wallet type cookie explicitly
+          setWalletTypeCookie('phantom');
+          
           setWalletConnected(true);
           
           // Диспетчеризация события подключения кошелька
@@ -455,6 +604,9 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
       window.phantomInitialized = true;
       localStorage.setItem('walletType', 'phantom');
       localStorage.setItem('walletPublicKey', responsePublicKey);
+      
+      // Set wallet type cookie explicitly
+      setWalletTypeCookie('phantom');
       
       // Явно устанавливаем флаг forceNftRefresh для Phantom
       window.forceNftRefresh = true;
@@ -565,6 +717,16 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
       }
     }
     
+    // Remove Solflare event listeners if they were registered
+    if (window.solflare && window.__WALLET_TYPE__ === 'solflare') {
+      try {
+        window.solflare.off?.('disconnect', handleSolflareDisconnect);
+        window.solflare.off?.('accountChanged', handleSolflareAccountChanged);
+      } catch (e) {
+        console.error('[WalletProvider] Error removing Solflare event listeners:', e);
+      }
+    }
+    
     // Сбрасываем внутреннее состояние
     setWalletConnected(false);
     setLocalPublicKey('');
@@ -668,11 +830,41 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
       
       // Определяем тип подключенного кошелька
       const detectWalletType = (): "phantom" | "solflare" | undefined => {
-        if (window.solana?.isPhantom) {
-          return "phantom";
-        } else if (window.solflare?.isSolflare) {
-          return "solflare";
+        console.log("Detecting wallet type...");
+        console.log("Solflare detected?", !!window.solflare?.isSolflare);
+        console.log("Phantom detected?", !!window.solana?.isPhantom);
+        
+        // Check if both wallets are detected, log details for debugging
+        if (window.solflare?.isSolflare && window.solana?.isPhantom) {
+          console.log("WARNING: Both Solflare and Phantom detected");
+          console.log("Solflare connected?", window.solflare?.isConnected);
+          console.log("Phantom connected?", window.solana?.isConnected);
+          
+          // If both are detected, check which one is actually connected
+          if (window.solflare?.isConnected && !window.solana?.isConnected) {
+            console.log("Solflare is connected but Phantom is not - using Solflare");
+            return "solflare";
+          } else if (!window.solflare?.isConnected && window.solana?.isConnected) {
+            console.log("Phantom is connected but Solflare is not - using Phantom");
+            return "phantom";
+          } else if (window.solflare?.isConnected && window.solana?.isConnected) {
+            console.log("BOTH wallets report as connected - prioritizing Solflare");
+            return "solflare";
+          }
+          
+          // If neither is connected, prioritize Solflare
+          console.log("Neither wallet is connected - prioritizing Solflare based on detection");
         }
+        
+        if (window.solflare?.isSolflare) {
+          console.log("Selecting Solflare wallet");
+          return "solflare";
+        } else if (window.solana?.isPhantom) {
+          console.log("Selecting Phantom wallet");
+          return "phantom";
+        }
+        
+        console.log("No wallet detected");
         return undefined;
       };
       
@@ -681,6 +873,9 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
         const walletType = detectWalletType();
         window.__WALLET_TYPE__ = walletType;
         console.log(`Detected wallet type: ${walletType}`);
+        
+        // Set wallet type cookie
+        setWalletTypeCookie(walletType);
         
         // Особая обработка для Phantom кошелька
         if (walletType === 'phantom') {
@@ -782,63 +977,141 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
       
       // Автоматически пытаемся переподключиться к Phantom при загрузке, если был сохранен
       if (savedWalletType === 'phantom' && window.solana && window.solana.isPhantom) {
-        // Используем setTimeout для задержки, чтобы дать время на инициализацию
+        // Phantom reconnection code (existing)
+        // ... existing code ...
+      }
+      // Auto reconnect to Solflare if it was the last used wallet
+      else if (savedWalletType === 'solflare' && window.solflare && window.solflare.isSolflare) {
+        // Use setTimeout to allow for wallet initialization
         setTimeout(async () => {
           try {
-            // Если Phantom уже подключен, используем текущий ключ
-            if (window.solana?.isConnected && window.solana?.publicKey) {
-              const currentPhantomKey = window.solana?.publicKey.toString();
+            // If Solflare is already connected, use the current key
+            if (window.solflare?.isConnected && window.solflare?.publicKey) {
+              const currentSolflareKey = window.solflare.publicKey.toString();
               
-              // Проверяем соответствие сохраненного ключа и текущего ключа Phantom
-              if (currentPhantomKey !== savedPublicKey) {
-                console.log('[WalletProvider] Detected key mismatch:', {
+              // Check if saved key matches current key
+              if (currentSolflareKey !== savedPublicKey) {
+                console.log('[WalletProvider] Detected Solflare key mismatch:', {
                   saved: savedPublicKey,
-                  current: currentPhantomKey
+                  current: currentSolflareKey
                 });
                 
-                // Диспетчеризация события несоответствия ключей
-                const mismatchEvent = new CustomEvent('phantomKeyMismatch', {
-                  detail: { 
-                    savedKey: savedPublicKey, 
-                    currentKey: currentPhantomKey 
-                  }
-                });
-                window.dispatchEvent(mismatchEvent);
-                
-                // Обновляем состояние до текущего значения Phantom
-                setLocalPublicKey(currentPhantomKey);
-                window.__WALLET_PUBLIC_KEY__ = currentPhantomKey;
-                localStorage.setItem('walletPublicKey', currentPhantomKey);
+                // Update state to current Solflare value
+                setLocalPublicKey(currentSolflareKey);
+                window.__WALLET_PUBLIC_KEY__ = currentSolflareKey;
+                localStorage.setItem('walletPublicKey', currentSolflareKey);
               }
               
-              // В любом случае считаем Phantom подключенным
+              // Consider Solflare connected
               setWalletConnected(true);
               window.__WALLET_CONNECTED__ = true;
-              window.phantomInitialized = true;
+              window.__WALLET_TYPE__ = 'solflare';
               
-              // Диспетчеризация события подключения кошелька
-              const event = new CustomEvent('phantom-connected', {
-                detail: { publicKey: currentPhantomKey, retryCount: 0 }
-              });
-              window.dispatchEvent(event);
+              // Add Solflare event listeners
+              window.solflare.on?.('disconnect', handleSolflareDisconnect);
+              window.solflare.on?.('accountChanged', handleSolflareAccountChanged);
+              
+              // Trigger NFT refresh
+              window.forceNftRefresh = true;
+              
+              // Dispatch connection event
+              window.dispatchEvent(new CustomEvent('wallet-connection-change', {
+                detail: { publicKey: currentSolflareKey, walletType: 'solflare' }
+              }));
             } else {
-              // Пробуем подключиться автоматически
-              console.log('[WalletProvider] Attempting to reconnect to Phantom wallet...');
-              connectPhantom();
+              // Try to reconnect automatically
+              console.log('[WalletProvider] Attempting to reconnect to Solflare wallet directly...');
+              
+              try {
+                // Attempt direct reconnection with Solflare
+                if (window.solflare) {
+                  const response = await window.solflare.connect();
+                  if (response && response.publicKey) {
+                    const publicKey = response.publicKey.toString();
+                    console.log(`[WalletProvider] Successfully reconnected to Solflare: ${publicKey}`);
+                    
+                    // Update state with Solflare connection
+                    setLocalPublicKey(publicKey);
+                    window.__WALLET_PUBLIC_KEY__ = publicKey;
+                    window.__WALLET_CONNECTED__ = true;
+                    window.__WALLET_TYPE__ = 'solflare';
+                    localStorage.setItem('walletType', 'solflare');
+                    localStorage.setItem('walletPublicKey', publicKey);
+                    setWalletConnected(true);
+                    
+                    // Set wallet type cookie explicitly
+                    setWalletTypeCookie('solflare');
+                    
+                    // Add Solflare event listeners
+                    if (window.solflare) {
+                      window.solflare.on?.('disconnect', handleSolflareDisconnect);
+                      window.solflare.on?.('accountChanged', handleSolflareAccountChanged);
+                    }
+                    
+                    // Trigger NFT refresh
+                    window.forceNftRefresh = true;
+                    
+                    // Dispatch connection event
+                    window.dispatchEvent(new CustomEvent('wallet-connection-change', {
+                      detail: { publicKey, walletType: 'solflare' }
+                    }));
+                  }
+                }
+              } catch (err) {
+                console.log('[WalletProvider] Failed direct Solflare reconnection, falling back to adapter selection');
+                
+                // Fallback - attempt using wallet adapter selection
+                // This approach uses the wallet modal instead of direct connection
+                const walletButtons = document.querySelectorAll('.wallet-adapter-modal-list button');
+                const solflareButton = Array.from(walletButtons).find(
+                  button => button.textContent?.includes('Solflare')
+                );
+                
+                if (solflareButton instanceof HTMLElement) {
+                  solflareButton.click();
+                }
+              }
             }
           } catch (error) {
-            console.error('[WalletProvider] Error auto-reconnecting to Phantom:', error);
+            console.error('[WalletProvider] Error auto-reconnecting to Solflare:', error);
           }
         }, PHANTOM_RECONNECT_DELAY);
-      }
-      // Для Solflare используем стандартную логику восстановления соединения
-      else if (savedWalletType === 'solflare') {
-        // Существующая логика автоматического переподключения к Solflare
       }
     }
     
     // Создаем функцию для проверки изменений состояния подключения внешними скриптами
     const checkWalletConnectionStatus = () => {
+      // Check for Solflare wallet connection first
+      if (window.solflare && window.solflare.isSolflare && window.solflare.isConnected && 
+          window.solflare.publicKey && !walletConnected) {
+        const solflareKey = window.solflare.publicKey.toString();
+        console.log('[WalletProvider] External Solflare connection detected:', solflareKey);
+        
+        setLocalPublicKey(solflareKey);
+        window.__WALLET_PUBLIC_KEY__ = solflareKey;
+        window.__WALLET_CONNECTED__ = true;
+        window.__WALLET_TYPE__ = 'solflare';
+        localStorage.setItem('walletType', 'solflare');
+        localStorage.setItem('walletPublicKey', solflareKey);
+        setWalletConnected(true);
+        
+        // Force NFT refresh after external connection
+        window.forceNftRefresh = true;
+        
+        // Dispatch wallet connection event
+        window.dispatchEvent(new CustomEvent('wallet-connection-change', {
+          detail: { publicKey: solflareKey, connected: true, walletType: 'solflare' }
+        }));
+      }
+      
+      // Check for Solflare wallet disconnection
+      if (window.solflare && window.solflare.isSolflare && 
+          (!window.solflare.isConnected || !window.solflare.publicKey) && 
+          walletConnected && window.__WALLET_TYPE__ === 'solflare') {
+        console.log('[WalletProvider] External Solflare disconnection detected');
+        resetWalletState();
+      }
+      
       // Проверка, если кошелек Phantom подключен, но наше состояние не соответствует
       if (window.solana && window.solana.isPhantom && window.solana.isConnected && 
           window.solana.publicKey && !walletConnected) {
@@ -891,10 +1164,16 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
         window.solana.off?.('disconnect', handlePhantomDisconnect);
         window.solana.off?.('accountChanged', handlePhantomAccountChanged);
       }
+      
+      // Remove Solflare event listeners on component unmount
+      if (window.solflare && window.__WALLET_TYPE__ === 'solflare') {
+        window.solflare.off?.('disconnect', handleSolflareDisconnect);
+        window.solflare.off?.('accountChanged', handleSolflareAccountChanged);
+      }
     };
   }, [walletConnected]);
 
-  // Добавляем обработчики событий для UI элементов
+  // Обработчики событий для UI элементов
   const handleQuestClick = (questId: number) => {
     if (questId !== 1 && !isQuestActive(questId) && !isQuestCompleted(questId)) {
       return; // Не реагируем на клик, если квест неактивен
@@ -908,6 +1187,7 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
       setIsLoading(true);
       
       try {
+        console.log(`Attempting to complete quest ${activeQuest} for wallet ${publicKey.toString()}`);
         // Вызываем соответствующий сервис в зависимости от ID квеста
         let success = false;
         
@@ -916,26 +1196,49 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
         
         switch (activeQuest) {
           case 1:
+            console.log('Initiating Twitter connection...');
             const twitterResult = await QuestServices.connectTwitter();
             success = twitterResult.success;
+            console.log('Twitter connection result:', twitterResult);
             break;
           case 2:
+            console.log('Initiating Discord connection...');
             const discordResult = await QuestServices.connectDiscord();
             success = discordResult.success;
+            console.log('Discord connection result:', discordResult);
             break;
           case 3:
+            console.log('Initiating Telegram connection...');
             const telegramResult = await QuestServices.connectTelegram();
             success = telegramResult.success;
+            console.log('Telegram connection result:', telegramResult);
             break;
         }
         
         // Если авторизация прошла успешно, отмечаем квест как выполненный
         if (success) {
+          console.log(`Quest ${activeQuest} authorization successful, marking as completed...`);
           completeQuest(activeQuest);
+          
+          // Show success toast
+          toast.success(`Quest completed successfully! You earned points!`);
+          
+          // Close quest details
           setActiveQuest(null);
+          
+          // Wait a moment and then dispatch an event to refresh quest state
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('quest-completed', {
+              detail: { questId: activeQuest, walletAddress: publicKey.toString() }
+            }));
+          }, 500);
+        } else {
+          console.log(`Quest ${activeQuest} authorization failed or was cancelled`);
+          toast.error('Quest completion failed or was cancelled');
         }
       } catch (error) {
         console.error('Error completing quest:', error);
+        toast.error('An error occurred while completing the quest');
       } finally {
         setIsLoading(false);
       }
@@ -970,6 +1273,7 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
     setIsLoadingInviteCode(true);
     setInviteCodeError(null);
     setUserInviteCode(null);
+    setReferralStats(null);
     
     try {
       // Возвращаемся к GET запросу, так как сервер не поддерживает POST
@@ -1035,12 +1339,40 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
         if (data && data.inviteCode) {
           console.log('Setting invite code:', data.inviteCode);
           setUserInviteCode(data.inviteCode);
+          
+          // Также получаем статистику по рефералам, если она доступна
+          if (data.referralStats) {
+            setReferralStats({
+              count: data.referralStats.count || 0,
+              points: data.referralStats.points || 0
+            });
+          } else {
+            // Если сервер не вернул статистику, устанавливаем дефолтные значения
+            setReferralStats({ count: 0, points: 0 });
+          }
         } else {
           throw new Error('Invalid response format from the server.');
         }
       } catch (parseError) {
         console.error('Error parsing JSON response:', parseError, 'Response text:', responseText);
         throw new Error('Failed to process the server response.');
+      }
+      
+      // Дополнительно получаем статистику по рефералам
+      try {
+        const statsResponse = await fetch(`/api/referral-stats?walletAddress=${publicKey.toString()}`);
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json();
+          if (statsData) {
+            setReferralStats({
+              count: statsData.count || 0,
+              points: statsData.points || 0
+            });
+          }
+        }
+      } catch (statsError) {
+        console.error('Error fetching referral stats:', statsError);
+        // Не выбрасываем ошибку, так как это не критично
       }
     } catch (err) {
       console.error('Error getting invite code:', err);
@@ -1112,47 +1444,32 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
               
               <div className="wallet-modal-content">
                 <div className="wallet-tabs-container">
-                  {/* Левая часть с вкладками квестов */}
-                  <div className="wallet-tabs-sidebar">
-                    <div className="sidebar-quests">
-                      {quests.map(quest => (
-                        <div 
-                          key={quest.id}
-                          className={`sidebar-quest-item ${activeQuest === quest.id ? 'active' : ''} ${isQuestCompleted(quest.id) ? 'completed' : ''}`}
-                          onClick={() => handleQuestClick(quest.id)}
-                          data-quest-id={quest.id}
-                        >
-                          <div className="quest-icon">
-                            <img src={quest.icon} alt={quest.title} />
-                          </div>
-                          <div className="quest-title-small">{quest.title}</div>
-                          {isQuestCompleted(quest.id) && <div className="quest-completed-badge">✓</div>}
-                          {quest.id !== 1 && !isQuestActive(quest.id) && !isQuestCompleted(quest.id) && <div className="quest-locked-badge">🔒</div>}
-                        </div>
-                      ))}
+                  {/* Tab navigation */}
+                  <div className="wallet-tabs-navigation">
+                    <div 
+                      className={`tab-item ${activeTab === 'profile' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('profile')}
+                    >
+                      <div className="tab-icon">
+                        <img src="/profile-icon.jpg" alt="Profile" />
+                      </div>
+                      <div className="tab-title">Profile</div>
+                    </div>
+                    <div 
+                      className={`tab-item ${activeTab === 'quests' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('quests')}
+                    >
+                      <div className="tab-icon">
+                        <img src="/quests-icon.jpg" alt="Quests" />
+                      </div>
+                      <div className="tab-title">Quests</div>
                     </div>
                   </div>
                   
-                  {/* Правая часть с информацией */}
+                  {/* Содержимое вкладки */}
                   <div className="wallet-tabs-content">
-                    {activeQuest ? (
-                      // Отображение информации о выбранном квесте
-                      <div className="quest-details">
-                        <h3>{quests.find(q => q.id === activeQuest)?.title}</h3>
-                        <p>Complete this quest to earn {quests.find(q => q.id === activeQuest)?.points} points!</p>
-                        
-                        <Button 
-                          onClick={handleCompleteQuest} 
-                          disabled={!isQuestActive(activeQuest) || isQuestCompleted(activeQuest) || isLoading}
-                          className="complete-quest-btn"
-                        >
-                          {isLoading ? 'Connecting...' : 
-                           isQuestCompleted(activeQuest) ? 'Completed' : 
-                           !isQuestActive(activeQuest) ? 'Locked' : 'Complete Quest'}
-                        </Button>
-                      </div>
-                    ) : (
-                      // Основная информация
+                    {activeTab === 'profile' && (
+                      // Основная информация профиля
                       <div className="wallet-info-tab">
                         <div className="user-profile-section">
                           <div className="name-field">
@@ -1191,26 +1508,30 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
                           <div className="collection-header">×YOUR COLLECTION×</div>
                           
                           <div className="nft-cards-container">
-                            {Object.entries(ownedNFTs).length > 0 ? (
-                              Object.entries(ownedNFTs).map(([nftId, count]) => {
-                                const nftData = {
-                                  "NFT1": { name: "Kōjō", class: "common", max: 50, image: "/kojo-image.png" },
-                                  "NFT2": { name: "Daimyō", class: "rare", max: 25, image: "/daimyo-image.png" },
-                                  "NFT3": { name: "Shōgun", class: "legendary", max: 10, image: "/shogun-image.png" }
-                                }[nftId] || { name: "Unknown", class: "unknown", max: 0, image: "" };
+                            {(() => {
+                              // Define all available NFTs regardless of ownership
+                              const allNFTs = {
+                                "NFT1": { name: "Kōjō", class: "common", max: 50, image: "/kojo-image.png" },
+                                "NFT2": { name: "Daimyō", class: "rare", max: 25, image: "/daimyo-image.png" },
+                                "NFT3": { name: "Shōgun", class: "legendary", max: 10, image: "/shogun-image.png" }
+                              };
+                              
+                              // Always display all NFT types
+                              return Object.entries(allNFTs).map(([nftId, nftData]) => {
+                                const count = ownedNFTs[nftId] || 0;
+                                const isOwned = count > 0;
                                 
-                                return count > 0 ? (
-                                  <div key={nftId} className={`nft-card ${nftData.class}`}>
+                                return (
+                                  <div key={nftId} className={`nft-card ${nftData.class} ${!isOwned ? 'not-owned' : ''}`}>
                                     <div className="nft-card-image">
                                       <img src={nftData.image} alt={nftData.name} />
                                     </div>
                                     <div className="nft-card-name">{nftData.name}</div>
+                                    {count > 0 && <div className="nft-card-count">{count}</div>}
                                   </div>
-                                ) : null;
-                              })
-                            ) : (
-                              <div className="no-nfts-message">No NFTs in your collection</div>
-                            )}
+                                );
+                              });
+                            })()}
                           </div>
                           
                           <div className="nft-collection-stats">
@@ -1268,6 +1589,20 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
                           <div className="user-invite-code">
                             <div className="user-invite-code-label">Your invite code:</div>
                             <div className="user-invite-code-value">{userInviteCode}</div>
+                            
+                            {/* Добавляем отображение статистики по рефералам */}
+                            {referralStats && (
+                              <div className="referral-stats">
+                                <div className="referral-stats-item">
+                                  <span className="referral-stats-label">Registered Users:</span>
+                                  <span className="referral-stats-value">{referralStats.count}</span>
+                                </div>
+                                <div className="referral-stats-item">
+                                  <span className="referral-stats-label">Points Earned:</span>
+                                  <span className="referral-stats-value">{referralStats.points}</span>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                         
@@ -1321,6 +1656,53 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
                             Disconnect
                           </Button>
                         </div>
+                      </div>
+                    )}
+                    
+                    {activeTab === 'quests' && (
+                      <div className="quests-tab">
+                        {activeQuest ? (
+                          // Отображение информации о выбранном квесте
+                          <div className="quest-details">
+                            <button className="back-button" onClick={() => setActiveQuest(null)}>← Back to quests</button>
+                            <h3>{quests.find(q => q.id === activeQuest)?.title}</h3>
+                            <p>Complete this quest to earn {quests.find(q => q.id === activeQuest)?.points} points!</p>
+                            
+                            <Button 
+                              onClick={handleCompleteQuest} 
+                              disabled={!isQuestActive(activeQuest) || isQuestCompleted(activeQuest) || isLoading}
+                              className="complete-quest-btn"
+                            >
+                              {isLoading ? 'Connecting...' : 
+                               isQuestCompleted(activeQuest) ? 'Completed' : 
+                               !isQuestActive(activeQuest) ? 'Locked' : 'Complete Quest'}
+                            </Button>
+                          </div>
+                        ) : (
+                          // Список всех квестов
+                          <div className="quests-list">
+                            {quests.map(quest => (
+                              <div 
+                                key={quest.id}
+                                className={`quest-item ${isQuestCompleted(quest.id) ? 'completed' : ''} ${!isQuestActive(quest.id) && !isQuestCompleted(quest.id) ? 'locked' : ''}`}
+                                onClick={() => handleQuestClick(quest.id)}
+                              >
+                                <div className="quest-icon">
+                                  <img src={quest.icon} alt={quest.title} />
+                                </div>
+                                <div className="quest-info">
+                                  <div className="quest-title">{quest.title}</div>
+                                  <div className="quest-points">{quest.points} points</div>
+                                </div>
+                                <div className="quest-status">
+                                  {isQuestCompleted(quest.id) && <div className="quest-completed-badge">✓</div>}
+                                  {!isQuestActive(quest.id) && !isQuestCompleted(quest.id) && <div className="quest-locked-badge">🔒</div>}
+                                  {isQuestActive(quest.id) && !isQuestCompleted(quest.id) && <div className="quest-active-badge">→</div>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1406,127 +1788,58 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
         
         .wallet-tabs-container {
           display: flex;
+          flex-direction: row;
           height: 500px;
         }
         
-        .wallet-tabs-sidebar {
-          width: 80px;
-          background: #1a1a1a;
-          border-right: 1px solid #333;
+        .wallet-tabs-navigation {
           display: flex;
           flex-direction: column;
+          border-right: 1px solid #333;
+          background: #1a1a1a;
+          width: 80px;
         }
         
-        .sidebar-header {
-          padding: 15px 0;
-          display: flex;
-          justify-content: center;
-          border-bottom: 1px solid #333;
-        }
-        
-        .avatar-container {
-          width: 50px;
-          height: 50px;
-          border-radius: 50%;
-          overflow: hidden;
-          border: 2px solid #FFD700;
-        }
-        
-        .avatar-image {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-        
-        .sidebar-quests {
-          flex: 1;
-          overflow-y: auto;
-          padding: 10px 0;
-        }
-        
-        .sidebar-quest-item {
+        .tab-item {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: 10px 5px;
+          justify-content: center;
+          padding: 20px 0;
           cursor: pointer;
-          position: relative;
           transition: all 0.2s ease;
           border-left: 3px solid transparent;
         }
         
-        .sidebar-quest-item.active {
+        .tab-item.active {
           background: rgba(255, 215, 0, 0.1);
           border-left: 3px solid #FFD700;
         }
         
-        .sidebar-quest-item.completed {
-          border-left: 3px solid #51ff00;
-        }
-        
-        .sidebar-quest-item:not(.active):not(.completed) {
-          opacity: 0.5;
-          cursor: not-allowed;
-          position: relative;
-        }
-        
-        .quest-locked-badge {
-          position: absolute;
-          top: 5px;
-          right: 5px;
-          width: 15px;
-          height: 15px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 10px;
-          color: #fff;
-        }
-        
-        // Стили для первого квеста (всегда активен)
-        .sidebar-quest-item[data-quest-id="1"] {
-          opacity: 1 !important;
-          cursor: pointer !important;
-          background: rgba(255, 215, 0, 0.1);
-          border-left: 3px solid #FFD700;
-        }
-        
-        .quest-icon {
+        .tab-icon {
           width: 30px;
           height: 30px;
           margin-bottom: 5px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
         
-        .quest-icon img {
+        .tab-icon img {
           width: 100%;
           height: 100%;
           object-fit: contain;
         }
         
-        .quest-title-small {
-          font-size: 10px;
+        .tab-title {
+          font-size: 12px;
           color: #ccc;
           text-align: center;
-          max-width: 100%;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
         }
         
-        .quest-completed-badge {
-          position: absolute;
-          top: 5px;
-          right: 5px;
-          width: 15px;
-          height: 15px;
-          background: #51ff00;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 10px;
-          color: #000;
+        .tab-item.active .tab-title {
+          color: #FFD700;
+          font-weight: bold;
         }
         
         .wallet-tabs-content {
@@ -1535,11 +1848,116 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
           overflow-y: auto;
         }
         
+        .quests-tab {
+          height: 100%;
+        }
+        
+        .quests-list {
+          display: flex;
+          flex-direction: column;
+          gap: 15px;
+        }
+        
+        .quest-item {
+          display: flex;
+          align-items: center;
+          padding: 15px;
+          background: rgba(0, 0, 0, 0.3);
+          border-radius: 10px;
+          border: 1px solid #333;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        
+        .quest-item:hover {
+          background: rgba(0, 0, 0, 0.5);
+          border-color: #555;
+        }
+        
+        .quest-item.completed {
+          border-left: 3px solid #51ff00;
+        }
+        
+        .quest-item.locked {
+          opacity: 0.7;
+          cursor: not-allowed;
+        }
+        
+        .quest-icon {
+          width: 40px;
+          height: 40px;
+          margin-right: 15px;
+        }
+        
+        .quest-icon img {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+        }
+        
+        .quest-info {
+          flex: 1;
+        }
+        
+        .quest-title {
+          font-weight: bold;
+          color: white;
+          margin-bottom: 5px;
+        }
+        
+        .quest-points {
+          font-size: 12px;
+          color: #FFD700;
+        }
+        
+        .quest-status {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 30px;
+        }
+        
+        .quest-completed-badge {
+          width: 24px;
+          height: 24px;
+          background: #51ff00;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          color: #000;
+        }
+        
+        .quest-locked-badge {
+          font-size: 18px;
+          color: #999;
+        }
+        
+        .quest-active-badge {
+          font-size: 18px;
+          color: #FFD700;
+        }
+        
         .quest-details {
           padding: 20px;
           background: rgba(0, 0, 0, 0.3);
           border-radius: 10px;
           border: 1px solid #333;
+        }
+        
+        .back-button {
+          background: none;
+          border: none;
+          color: #999;
+          cursor: pointer;
+          padding: 0;
+          margin-bottom: 15px;
+          transition: color 0.2s ease;
+        }
+        
+        .back-button:hover {
+          color: #FFD700;
         }
         
         .quest-details h3 {
@@ -1855,6 +2273,33 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
           font-size: 12px;
           margin-bottom: 10px;
           text-align: center;
+        }
+        
+        .nft-card.not-owned {
+          opacity: 0.5;
+          filter: grayscale(70%);
+        }
+        
+        .referral-stats {
+          margin-top: 15px;
+          padding-top: 10px;
+          border-top: 1px dashed rgba(255, 215, 0, 0.3);
+        }
+        
+        .referral-stats-item {
+          display: flex;
+          justify-content: space-between;
+          margin-top: 5px;
+          font-size: 14px;
+        }
+        
+        .referral-stats-label {
+          color: #ccc;
+        }
+        
+        .referral-stats-value {
+          color: #51ff00;
+          font-weight: bold;
         }
       `}</style>
       

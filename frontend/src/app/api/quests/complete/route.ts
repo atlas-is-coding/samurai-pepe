@@ -81,8 +81,8 @@ async function completeQuest(walletAddress: string, questId: number) {
     });
   }
   
-  // Определяем количество очков за разные типы квестов
-  let pointsToAdd = 5; // По умолчанию 5 очков
+  // Фиксированное количество очков за выполнение любого квеста - 5 очков
+  const pointsToAdd = 5;
   let questName = '';
   
   switch (questId) {

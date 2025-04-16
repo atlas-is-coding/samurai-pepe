@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
     // Обновляем статус квеста
     try {
       // Используем новый API для выполнения квеста
-      const questResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/quests/complete`, {
+      const questResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/quests/complete`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -97,6 +97,12 @@ export async function GET(request: NextRequest) {
           questId: 3 // Telegram квест
         })
       });
+      
+      if (!questResponse.ok) {
+        const errorText = await questResponse.text();
+        console.error('Failed to complete Telegram quest:', errorText);
+        throw new Error(`Failed to complete quest: ${questResponse.status}`);
+      }
       
       const questResult = await questResponse.json();
       console.log('Результат выполнения Telegram квеста:', questResult);

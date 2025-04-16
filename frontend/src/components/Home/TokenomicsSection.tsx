@@ -48,9 +48,9 @@ export function TokenomicsSection() {
         <div className="nft-allocation">
           <h3>NFT Token Allocation</h3>
           <ul>
-            <li><span className="nft-type">Kōjō (Common):</span> 5,000 points per NFT</li>
-            <li><span className="nft-type">Daimyō (Rare):</span> 15,000 points per NFT</li>
-            <li><span className="nft-type">Shōgun (Legendary):</span> 50,000 points per NFT</li>
+            <li><span className="nft-type">Kōjō (Common):</span> 100 points per NFT</li>
+            <li><span className="nft-type">Daimyō (Rare):</span> 500 points per NFT</li>
+            <li><span className="nft-type">Shōgun (Legendary):</span> 2500 points per NFT</li>
           </ul>
         </div>
       </div>

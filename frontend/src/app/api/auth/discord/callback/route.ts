@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
       try {
         // Вместо прямого взаимодействия с базой данных используем созданный API
         // для добавления выполненного квеста
-        const questCompletionResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/quests/complete`, {
+        const questCompletionResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/quests/complete`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -147,8 +147,14 @@ export async function GET(request: NextRequest) {
           })
         });
         
+        if (!questCompletionResponse.ok) {
+          const errorText = await questCompletionResponse.text();
+          console.error('Failed to complete Discord quest:', errorText);
+          throw new Error(`Failed to complete quest: ${questCompletionResponse.status}`);
+        }
+        
         const questResult = await questCompletionResponse.json();
-        console.log('Результат выполнения квеста:', questResult);
+        console.log('Результат выполнения Discord квеста:', questResult);
       } catch (error) {
         console.error('Ошибка при выполнении Discord квеста:', error);
       }

@@ -149,7 +149,8 @@ export async function GET(request: NextRequest) {
         
         // Используем новый API для выполнения квеста
         try {
-          const questCompletionResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/quests/complete`, {
+          // Use a relative URL path for API calls on the server side
+          const questCompletionResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/quests/complete`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
@@ -159,6 +160,12 @@ export async function GET(request: NextRequest) {
               questId: 1 // Twitter квест
             })
           });
+          
+          if (!questCompletionResponse.ok) {
+            const errorText = await questCompletionResponse.text();
+            console.error('Failed to complete Twitter quest:', errorText);
+            throw new Error(`Failed to complete quest: ${questCompletionResponse.status}`);
+          }
           
           const questResult = await questCompletionResponse.json();
           console.log('Результат выполнения Twitter квеста:', questResult);

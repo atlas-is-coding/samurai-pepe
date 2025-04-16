@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
+// Определение баллов для каждого типа NFT
+const NFT_POINTS = {
+  'NFT1': 100,  // Kōjō (Common)
+  'NFT2': 500,  // Daimyō (Rare)
+  'NFT3': 2500  // Shōgun (Legendary)
+};
+
 // POST /api/nft/sync-points
 // Обновляет баллы пользователя на основе уже имеющихся NFT
 export async function POST(request: NextRequest) {
@@ -25,9 +32,9 @@ export async function POST(request: NextRequest) {
     }
     
     // Рассчитываем общее количество баллов на основе владения NFT
-    const nft1Points = (nfts.NFT1 || 0) * 10;
-    const nft2Points = (nfts.NFT2 || 0) * 20;
-    const nft3Points = (nfts.NFT3 || 0) * 50;
+    const nft1Points = (nfts.NFT1 || 0) * NFT_POINTS.NFT1;
+    const nft2Points = (nfts.NFT2 || 0) * NFT_POINTS.NFT2;
+    const nft3Points = (nfts.NFT3 || 0) * NFT_POINTS.NFT3;
     const totalNftPoints = nft1Points + nft2Points + nft3Points;
     
     // Проверяем, есть ли NFT вообще
@@ -72,7 +79,7 @@ export async function POST(request: NextRequest) {
           data: {
             userId: user.id,
             nftId: 'NFT1',
-            pointsAwarded: 10
+            pointsAwarded: NFT_POINTS.NFT1
           }
         });
       }
@@ -82,7 +89,7 @@ export async function POST(request: NextRequest) {
           data: {
             userId: user.id,
             nftId: 'NFT2',
-            pointsAwarded: 20
+            pointsAwarded: NFT_POINTS.NFT2
           }
         });
       }
@@ -92,7 +99,7 @@ export async function POST(request: NextRequest) {
           data: {
             userId: user.id,
             nftId: 'NFT3',
-            pointsAwarded: 50
+            pointsAwarded: NFT_POINTS.NFT3
           }
         });
       }
@@ -120,16 +127,19 @@ export async function POST(request: NextRequest) {
       
       // Рассчитываем баллы за существующие NFT
       const existingNftPoints = 
-        existingNfts.NFT1 * 10 + 
-        existingNfts.NFT2 * 20 + 
-        existingNfts.NFT3 * 50;
+        existingNfts.NFT1 * NFT_POINTS.NFT1 + 
+        existingNfts.NFT2 * NFT_POINTS.NFT2 + 
+        existingNfts.NFT3 * NFT_POINTS.NFT3;
       
       // Рассчитываем баллы за новые NFT
       const newNft1 = Math.max(0, (nfts.NFT1 || 0) - existingNfts.NFT1);
       const newNft2 = Math.max(0, (nfts.NFT2 || 0) - existingNfts.NFT2);
       const newNft3 = Math.max(0, (nfts.NFT3 || 0) - existingNfts.NFT3);
       
-      const newNftPoints = newNft1 * 10 + newNft2 * 20 + newNft3 * 50;
+      const newNftPoints = 
+        newNft1 * NFT_POINTS.NFT1 + 
+        newNft2 * NFT_POINTS.NFT2 + 
+        newNft3 * NFT_POINTS.NFT3;
       
       console.log(`Обнаружены новые NFT: ${newNft1}x NFT1, ${newNft2}x NFT2, ${newNft3}x NFT3`);
       console.log(`Баллы за новые NFT: ${newNftPoints}`);
@@ -152,7 +162,7 @@ export async function POST(request: NextRequest) {
             data: {
               userId: user.id,
               nftId: 'NFT1',
-              pointsAwarded: 10
+              pointsAwarded: NFT_POINTS.NFT1
             }
           });
         }
@@ -162,7 +172,7 @@ export async function POST(request: NextRequest) {
             data: {
               userId: user.id,
               nftId: 'NFT2',
-              pointsAwarded: 20
+              pointsAwarded: NFT_POINTS.NFT2
             }
           });
         }
@@ -172,7 +182,7 @@ export async function POST(request: NextRequest) {
             data: {
               userId: user.id,
               nftId: 'NFT3',
-              pointsAwarded: 50
+              pointsAwarded: NFT_POINTS.NFT3
             }
           });
         }
