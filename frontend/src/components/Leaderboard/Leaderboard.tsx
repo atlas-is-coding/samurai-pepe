@@ -13,6 +13,7 @@ interface User {
   invitedBy: string | null;
   referralCount: number;
   twitterUsername: string | null;
+  nickname: string | null;
 }
 
 interface JoinInfo {
@@ -45,7 +46,8 @@ export function Leaderboard() {
       points: 0,
       invitedBy: null,
       referralCount: 0,
-      twitterUsername: null
+      twitterUsername: null,
+      nickname: null
     };
   }, [connected, publicKey]);
 
@@ -226,12 +228,18 @@ export function Leaderboard() {
                     <td>
                       <div className="user-info">
                         <div className="user-avatar current-user-avatar">
-                          @
+                          {currentUser?.twitterUsername 
+                            ? '@' 
+                            : currentUser?.nickname
+                              ? currentUser.nickname.charAt(0).toUpperCase()
+                              : publicKey ? publicKey.toString().charAt(0).toUpperCase() : '?'}
                         </div>
                         <div className="user-name">
                           {currentUser?.twitterUsername 
                             ? `@${currentUser.twitterUsername}` 
-                            : publicKey ? shortenAddress(publicKey.toString()) : 'Unknown'}
+                            : currentUser?.nickname
+                              ? currentUser.nickname
+                              : publicKey ? shortenAddress(publicKey.toString()) : 'Unknown'}
                           <span className="current-user-label"> (You)</span>
                         </div>
                       </div>
@@ -265,12 +273,16 @@ export function Leaderboard() {
                             <div className="user-avatar">
                               {user.twitterUsername 
                                 ? '@' 
-                                : user.walletAddress.charAt(0).toUpperCase()}
+                                : user.nickname
+                                  ? user.nickname.charAt(0).toUpperCase()
+                                  : user.walletAddress.charAt(0).toUpperCase()}
                             </div>
                             <div className="user-name">
                               {user.twitterUsername 
-                                ? `@${user.twitterUsername}` 
-                                : shortenAddress(user.walletAddress)}
+                                ? `@${user.twitterUsername}`
+                                : user.nickname
+                                  ? user.nickname
+                                  : shortenAddress(user.walletAddress)}
                             </div>
                           </div>
                         </td>

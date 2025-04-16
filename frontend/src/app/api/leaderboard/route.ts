@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
         points: true,
         referredBy: true,
         twitterUsername: true,
+        name: true,
         userReferrals: {
           select: {
             referredAddress: true,
@@ -91,6 +92,7 @@ export async function GET(request: NextRequest) {
         invitedBy: inviteCodeUsed, // Используем код приглашения, а не адрес
         referralCount: user.userReferrals.length,
         twitterUsername: user.twitterUsername || null,
+        nickname: user.name || null, // Include nickname
       };
     });
     

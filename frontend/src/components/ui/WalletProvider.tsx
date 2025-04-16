@@ -1679,7 +1679,6 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
                           // Отображение информации о выбранном квесте
                           <div className="quest-details">
                             <button className="back-button" onClick={() => setActiveQuest(null)}>← Back to quests</button>
-                            {console.log(`WalletInfo: Rendering quest details for quest ID: ${activeQuest}, isCompleted: ${isQuestCompleted(activeQuest)}`)}
                             <h3>{quests.find(q => q.id === activeQuest)?.title}</h3>
                             <p>Complete this quest to earn {quests.find(q => q.id === activeQuest)?.points} points!</p>
                             
@@ -1696,7 +1695,6 @@ function WalletInfo({ isPulse = true }: WalletInfoProps) {
                         ) : (
                           // Список всех квестов
                           <div className="quests-list">
-                            {console.log('WalletInfo: Rendering quests list, completed quests:', quests.map(q => ({id: q.id, completed: isQuestCompleted(q.id)})))}
                             {quests.map(quest => (
                               <div 
                                 key={quest.id}
